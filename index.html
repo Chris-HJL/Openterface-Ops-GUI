@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Openterface Ops GUI</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #333;
+        }
+        
+        .image-section {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .image-container {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        
+        .image-box {
+            flex: 1;
+            max-width: 500px;
+            text-align: center;
+        }
+        
+        .image-box h3 {
+            margin-bottom: 10px;
+            color: #666;
+        }
+        
+        img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        
+        .chat-section {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .chat-messages {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            margin-bottom: 20px;
+            background-color: #fafafa;
+        }
+        
+        .message {
+            margin-bottom: 15px;
+            padding: 10px;
+            border-radius: 4px;
+            max-width: 80%;
+        }
+        
+        .message.user {
+            background-color: #e3f2fd;
+            margin-left: auto;
+            text-align: right;
+        }
+        
+        .message.assistant {
+            background-color: #f1f8e9;
+            margin-right: auto;
+        }
+        
+        .chat-input {
+            display: flex;
+            gap: 10px;
+        }
+        
+        #query-input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        
+        button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        button:hover {
+            background-color: #45a049;
+        }
+        
+        .config-section {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .config-section h3 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+        
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .config-item {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .config-item label {
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #666;
+        }
+        
+        .config-item input {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        
+        .config-actions {
+            text-align: center;
+        }
+        
+        .error {
+            color: red;
+            margin-top: 10px;
+        }
+        
+        .loading {
+            color: #666;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Openterface Ops GUI</h1>
+        
+        <!-- Configuration Section -->
+        <div class="config-section">
+            <h3>Model Configuration</h3>
+            <div class="config-grid">
+                <div class="config-item">
+                    <label for="api-url">LLM API URL:</label>
+                    <input type="text" id="api-url" placeholder="Enter LLM API URL" value="http://localhost:11434/v1/chat/completions">
+                </div>
+                <div class="config-item">
+                    <label for="model">LLM Model:</label>
+                    <input type="text" id="model" placeholder="Enter LLM Model Name" value="qwen3-vl:32b">
+                </div>
+                <div class="config-item">
+                    <label for="ui-ins-api-url">UI-INS API URL:</label>
+                    <input type="text" id="ui-ins-api-url" placeholder="Enter UI-INS API URL" value="http://localhost:2345/v1/chat/completions">
+                </div>
+                <div class="config-item">
+                    <label for="ui-ins-model">UI-INS Model:</label>
+                    <input type="text" id="ui-ins-model" placeholder="Enter UI-INS Model Name" value="ui-ins-7b">
+                </div>
+            </div>
+            <div style="margin-top: 15px; padding: 15px; background-color: #f5f5f5; border-radius: 4px;">
+                <h4>API Key Configuration</h4>
+                <p>Please set the following environment variables before running the application:</p>
+                <ul style="list-style-type: disc; margin-left: 20px;">
+                    <li><strong>LLM_API_KEY</strong>: API key for the main language model (default: "EMPTY")</li>
+                    <li><strong>UI_API_KEY</strong>: API key for the UI-Ins model (default: "EMPTY")</li>
+                </ul>
+                <p>Example for Windows:</p>
+                <pre style="background-color: #e0e0e0; padding: 10px; border-radius: 4px; overflow-x: auto;">
+set LLM_API_KEY=your_llm_api_key
+set UI_API_KEY=your_ui_api_key</pre>
+                <p>Example for Linux/Mac:</p>
+                <pre style="background-color: #e0e0e0; padding: 10px; border-radius: 4px; overflow-x: auto;">
+export LLM_API_KEY=your_llm_api_key
+export UI_API_KEY=your_ui_api_key</pre>
+            </div>
+            <div class="config-actions">
+                <button id="init-btn">Initialize Session</button>
+            </div>
+        </div>
+        
+        <div class="image-section">
+            <div class="image-container">
+                <div class="image-box">
+                    <h3>Present Screen</h3>
+                    <img id="original-image" src="" alt="Present Screen">
+                </div>
+                <div class="image-box">
+                    <h3>Proposed Action</h3>
+                    <img id="processed-image" src="" alt="Proposed Action">
+                </div>
+            </div>
+        </div>
+        
+        <div class="chat-section">
+            <div class="chat-messages" id="chat-messages">
+                <div class="message assistant">
+                    Welcome to Openterface Ops API! Please enter your query.
+                </div>
+            </div>
+            <div class="chat-input">
+                <input type="text" id="query-input" placeholder="Enter your query...">
+                <button id="send-btn">Send</button>
+            </div>
+            <div id="error-message" class="error"></div>
+        </div>
+    </div>
+    
+    <script>
+        // API Configuration
+        const API_BASE_URL = 'http://localhost:9000';
+        let sessionId = '';
+        
+        // Initialization
+        async function init() {
+            try {
+                // Get configuration from input fields
+                const apiUrl = document.getElementById('api-url').value;
+                const model = document.getElementById('model').value;
+                const uiInsApiUrl = document.getElementById('ui-ins-api-url').value;
+                const uiInsModel = document.getElementById('ui-ins-model').value;
+                
+                // Create session with configuration
+                const sessionResponse = await fetch(`${API_BASE_URL}/create-session`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        language: 'en',
+                        api_url: apiUrl,
+                        model: model,
+                        ui_ins_api_url: uiInsApiUrl,
+                        ui_ins_model: uiInsModel
+                    })
+                });
+                
+                const sessionData = await sessionResponse.json();
+                if (sessionData.success) {
+                    sessionId = sessionData.session_id;
+                    console.log('Session created successfully:', sessionId);
+                    
+                    // Clear previous messages except welcome message
+                    const chatMessages = document.getElementById('chat-messages');
+                    chatMessages.innerHTML = '<div class="message assistant">Welcome to Openterface Ops API! Please enter your query.</div>';
+                    
+                    // Display available commands
+                    const helpMessage = `Available commands:<br>
+/quit, /exit, /q - Exit the program<br>
+/clear, /cls - Clear chat history<br>
+/help - Show help information<br>
+/info - Show API status information<br>
+/lang [en|zh] - Switch language<br>
+/multiturn - Enter multi-turn conversation mode<br>
+/single - Exit multi-turn conversation mode<br>
+/load docs - Load documents and build index<br>
+/unload docs - Close document index<br>
+/image - Get latest image`;
+                    addMessage(helpMessage, 'assistant');
+                    
+                    // Clear images
+                    document.getElementById('original-image').src = '';
+                    document.getElementById('processed-image').src = '';
+                    
+                    // Clear error message
+                    document.getElementById('error-message').textContent = '';
+                } else {
+                    throw new Error('Failed to create session');
+                }
+            } catch (error) {
+                console.error('Initialization failed:', error);
+                document.getElementById('error-message').textContent = 'Initialization failed: ' + error.message;
+            }
+        }
+        
+        // Get images
+        async function fetchImages() {
+            try {
+                // Call /get-image endpoint to get server image
+                const response = await fetch(`${API_BASE_URL}/get-image`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        session_id: sessionId
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.success && data.image) {
+                    // Only display original image
+                    document.getElementById('original-image').src = `data:image/jpeg;base64,${data.image}`;
+                }
+            } catch (error) {
+                console.error('Failed to get images:', error);
+                // Ignore image fetch failure, continue running
+            }
+        }
+        
+        // Send query
+        async function sendQuery() {
+            const queryInput = document.getElementById('query-input');
+            let query = queryInput.value.trim();
+            if (!query) return;
+            
+            // Clear error message
+            document.getElementById('error-message').textContent = '';
+            
+            // Handle special commands
+            // Exit program command (handled by frontend)
+            if (['/quit', '/exit', '/q'].includes(query.toLowerCase())) {
+                addMessage(query, 'user');
+                addMessage('Exit command received. You can close the browser window directly.', 'assistant');
+                queryInput.value = '';
+                return;
+            }
+            
+            // Clear history command
+            if (['/clear', '/cls'].includes(query.toLowerCase())) {
+                addMessage(query, 'user');
+                queryInput.value = '';
+                
+                try {
+                    const response = await fetch(`${API_BASE_URL}/clear-history`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            session_id: sessionId
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        addMessage('Chat history cleared', 'assistant');
+                    } else {
+                        throw new Error('Failed to clear history');
+                    }
+                } catch (error) {
+                    console.error('Failed to clear history:', error);
+                    document.getElementById('error-message').textContent = 'Failed to clear history: ' + error.message;
+                }
+                return;
+            }
+            
+            // Help command (handled by frontend)
+            if (query.toLowerCase() === '/help') {
+                addMessage(query, 'user');
+                queryInput.value = '';
+                
+                const helpMessage = `Available commands:<br>
+/quit, /exit, /q - Exit the program<br>
+/clear, /cls - Clear chat history<br>
+/help - Show help information<br>
+/info - Show API status information<br>
+/lang [en|zh] - Switch language<br>
+/multiturn - Enter multi-turn conversation mode<br>
+/single - Exit multi-turn conversation mode<br>
+/load docs - Load documents and build index<br>
+/unload docs - Close document index<br>
+/image - Get latest image`;
+                
+                addMessage(helpMessage, 'assistant');
+                return;
+            }
+            
+            // Show API info command
+            if (query.toLowerCase() === '/info') {
+                addMessage(query, 'user');
+                queryInput.value = '';
+                
+                try {
+                    const response = await fetch(`${API_BASE_URL}/status/${sessionId}`);
+                    const data = await response.json();
+                    if (data.success) {
+                        const infoMessage = `API Status Information:<br>
+Main API Status: ${data.api_status}<br>
+UI-Ins API Status: ${data.ui_ins_status}`;
+                        addMessage(infoMessage, 'assistant');
+                    } else {
+                        throw new Error('Failed to get API status');
+                    }
+                } catch (error) {
+                    console.error('Failed to get API status:', error);
+                    document.getElementById('error-message').textContent = 'Failed to get API status: ' + error.message;
+                }
+                return;
+            }
+            
+            // Language switch command
+            if (query.toLowerCase().startsWith('/lang')) {
+                addMessage(query, 'user');
+                queryInput.value = '';
+                
+                const parts = query.split(/\s+/);
+                if (parts.length === 1) {
+                    // Show current language (frontend can't get it directly, need to call API)
+                    addMessage('Please use /lang en or /lang zh to switch languages', 'assistant');
+                } else if (parts.length === 2) {
+                    const langCode = parts[1].toLowerCase();
+                    if (langCode === 'en' || langCode === 'zh') {
+                        try {
+                            const response = await fetch(`${API_BASE_URL}/switch-lang`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({
+                                    session_id: sessionId,
+                                    lang_code: langCode
+                                })
+                            });
+                            
+                            const data = await response.json();
+                            if (data.success) {
+                                addMessage(`Language switched to ${langCode}`, 'assistant');
+                            } else {
+                                throw new Error('Failed to switch language');
+                            }
+                        } catch (error) {
+                            console.error('Failed to switch language:', error);
+                            document.getElementById('error-message').textContent = 'Failed to switch language: ' + error.message;
+                        }
+                    } else {
+                        addMessage('Invalid language code. Please use en or zh', 'assistant');
+                    }
+                }
+                return;
+            }
+            
+            // Multi-turn conversation mode command
+            if (query.toLowerCase() === '/multiturn') {
+                addMessage(query, 'user');
+                queryInput.value = '';
+                
+                try {
+                    const response = await fetch(`${API_BASE_URL}/toggle-multiturn`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            session_id: sessionId,
+                            mode: true
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        addMessage('Entered multi-turn conversation mode', 'assistant');
+                    } else {
+                        throw new Error('Failed to switch to multi-turn conversation mode');
+                    }
+                } catch (error) {
+                    console.error('Failed to switch to multi-turn conversation mode:', error);
+                    document.getElementById('error-message').textContent = 'Failed to switch to multi-turn conversation mode: ' + error.message;
+                }
+                return;
+            }
+            
+            // Single-turn conversation mode command
+            if (query.toLowerCase() === '/single') {
+                addMessage(query, 'user');
+                queryInput.value = '';
+                
+                try {
+                    const response = await fetch(`${API_BASE_URL}/toggle-multiturn`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            session_id: sessionId,
+                            mode: false
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        addMessage('Exited multi-turn conversation mode, entered single-turn conversation mode', 'assistant');
+                    } else {
+                        throw new Error('Failed to switch to single-turn conversation mode');
+                    }
+                } catch (error) {
+                    console.error('Failed to switch to single-turn conversation mode:', error);
+                    document.getElementById('error-message').textContent = 'Failed to switch to single-turn conversation mode: ' + error.message;
+                }
+                return;
+            }
+            
+            // Load documents and build index command
+            if (query.toLowerCase() === '/load docs') {
+                addMessage(query, 'user');
+                queryInput.value = '';
+                
+                try {
+                    const response = await fetch(`${API_BASE_URL}/build-index`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            session_id: sessionId
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        addMessage('Document index built successfully', 'assistant');
+                    } else {
+                        addMessage(`Failed to build document index: ${data.message}`, 'assistant');
+                    }
+                } catch (error) {
+                    console.error('Failed to build document index:', error);
+                    document.getElementById('error-message').textContent = 'Failed to build document index: ' + error.message;
+                }
+                return;
+            }
+            
+            // Unload document index command
+            if (query.toLowerCase() === '/unload docs') {
+                addMessage(query, 'user');
+                queryInput.value = '';
+                
+                try {
+                    const response = await fetch(`${API_BASE_URL}/toggle-rag`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            session_id: sessionId
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        addMessage(data.rag_enabled ? 'Document index enabled' : 'Document index disabled', 'assistant');
+                    } else {
+                        addMessage(`Failed to unload document index: ${data.message}`, 'assistant');
+                    }
+                } catch (error) {
+                    console.error('Failed to unload document index:', error);
+                    document.getElementById('error-message').textContent = 'Failed to unload document index: ' + error.message;
+                }
+                return;
+            }
+            
+            // Get image command
+            if (query.toLowerCase() === '/image') {
+                // Add user message
+                addMessage(query, 'user');
+                
+                // Clear input box
+                queryInput.value = '';
+                
+                // Call get image function
+                try {
+                    await fetchImages();
+                    // Add system message
+                    addMessage('Latest image obtained. Please enter your question.', 'assistant');
+                } catch (error) {
+                    console.error('Failed to get image:', error);
+                    document.getElementById('error-message').textContent = 'Failed to get image: ' + error.message;
+                }
+                return;
+            }
+            
+            // Add user message
+            addMessage(query, 'user');
+            
+            // Clear input box
+            queryInput.value = '';
+            
+            // Clear current processed image
+            document.getElementById('processed-image').src = '';
+            
+            // Get send button element
+            const sendBtn = document.getElementById('send-btn');
+            
+            // Disable input and button, add loading message
+            queryInput.disabled = true;
+            sendBtn.disabled = true;
+            const loadingMessage = addMessage('Thinking...', 'assistant');
+            
+            try {
+                // Send request, do not re-fetch image, use previously obtained image
+                const response = await fetch(`${API_BASE_URL}/chat`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        session_id: sessionId,
+                        prompt: query
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    // Remove loading message
+                    loadingMessage.remove();
+                    // Add assistant message
+                    addMessage(data.response, 'assistant');
+                    
+                    // If there is an image, update processed image
+                    if (data.image) {
+                        document.getElementById('processed-image').src = `data:image/jpeg;base64,${data.image}`;
+                    }
+                } else {
+                    throw new Error('API response failed');
+                }
+            } catch (error) {
+                console.error('Failed to send query:', error);
+                document.getElementById('error-message').textContent = 'Failed to send query: ' + error.message;
+                // Remove loading message
+                loadingMessage.remove();
+            } finally {
+                // Re-enable input and button
+                queryInput.disabled = false;
+                sendBtn.disabled = false;
+            }
+        }
+        
+        // Add message to chat history
+        function addMessage(text, sender) {
+            const chatMessages = document.getElementById('chat-messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}`;
+            messageDiv.innerHTML = text.replace(/\n/g, '<br>');
+            chatMessages.appendChild(messageDiv);
+            
+            // Scroll to bottom
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            
+            // Return the created message element
+            return messageDiv;
+        }
+        
+        // Event listeners
+        document.getElementById('send-btn').addEventListener('click', sendQuery);
+        
+        document.getElementById('init-btn').addEventListener('click', init);
+        
+        document.getElementById('query-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendQuery();
+            }
+        });
+        
+        // Initialize application
+        init();
+    </script>
+</body>
+</html>
