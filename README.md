@@ -119,7 +119,7 @@ The application supports the following built-in commands that can be entered in 
 | `/clear`, `/cls` | Clear the chat history |
 | `/help` | Show help information with available commands |
 | `/info` | Display API status information for both models |
-| `/lang [en|zh]` | Switch between English and Chinese languages |
+| `/lang [en/zh]` | Switch between English and Chinese languages |
 | `/multiturn` | Enter multi-turn conversation mode (maintain context) |
 | `/single` | Exit multi-turn mode, return to single-turn mode |
 | `/load docs` | Load documents from the `./docs` directory and build an index |
@@ -150,27 +150,6 @@ The backend provides the following API endpoints:
 | `/toggle-rag` | POST | Toggle RAG functionality |
 | `/toggle-multiturn` | POST | Toggle multiturn conversation mode |
 | `/clear-history` | POST | Clear conversation history |
-
-## Directory Structure
-
-```
-Openterface-Ops-GUI/
-├── __pycache__/          # Python compiled files
-├── docs/                 # Documents for RAG indexing
-├── i18n/                 # Internationalization files
-├── images/               # Stored images
-├── index/                # Document index data
-├── output/               # Processed output images
-├── tools/                # Utility scripts
-├── index.html            # Frontend interface
-├── ops_api.py            # Main API server
-├── ops_cli.py            # CLI functionality (imported by API)
-├── requirements_ops_cli.txt  # CLI dependencies
-├── requirements_ui_ins.txt   # UI inspection dependencies
-├── test_api.py           # API test script
-├── test_image_workflow.py    # Image workflow test
-└── ui_ins_server.py      # UI inspection server
-```
 
 ## Session Management
 
@@ -218,21 +197,6 @@ The application logs information to the console, which can be helpful for debugg
 - API keys are handled through environment variables, not hardcoded in the application
 - CORS is enabled for development purposes, but should be restricted in production
 - Sessions are stored in memory and are not persisted across server restarts
-
-## Development
-
-### Running Tests
-
-```bash
-python test_api.py
-python test_image_workflow.py
-```
-
-### Extending the Application
-
-- Add new commands by modifying the chat handling logic in `index.html`
-- Extend API functionality by adding new endpoints in `ops_api.py`
-- Add support for additional languages by creating new translation files in the `i18n/` directory
 
 ## License
 
