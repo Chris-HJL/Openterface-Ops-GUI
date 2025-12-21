@@ -41,10 +41,10 @@ cd Openterface-Ops-GUI
 
 ```bash
 pip install -r requirements_ops_cli.txt
-pip install -r requirements_ui_ins.txt
+pip install -r requirements_ui_ins.txt #only when you want to deploy the UI model locally.
 ```
 
-3. Set environment variables for API keys (optional, depending on your model setup):
+3. Set environment variables for API keys (for online model only, depending on your model setup):
 
 **Windows:**
 ```cmd
