@@ -68,16 +68,16 @@ The application supports two types of models that can be configured through the 
    - **API URL**: Endpoint for the main language model (default: `http://localhost:11434/v1/chat/completions`)
    - **Model Name**: Name of the language model to use (default: `qwen3-vl:32b`)
 
-2. **UI-INS (UI Inspection Model)**
+2. **UI-Model (UI Inspection Model)**
    - **API URL**: Endpoint for the UI inspection model (default: `http://localhost:2345/v1/chat/completions`)
-   - **Model Name**: Name of the UI inspection model to use (default: `ui-ins-7b`)
+   - **Model Name**: Name of the UI inspection model to use (default: `fara-7b`)
 
 ### API Key Configuration
 
 API keys for the models are set through environment variables:
 
 - `LLM_API_KEY`: API key for the main language model (default: "EMPTY")
-- `UI_API_KEY`: API key for the UI-Ins model (default: "EMPTY")
+- `UI_API_KEY`: API key for the UI-Model (default: "EMPTY")
 
 ## Usage
 
@@ -96,7 +96,7 @@ python ops_api.py
 ### Initial Setup
 
 1. On the web interface, configure the model settings in the "Model Configuration" section:
-   - Enter the API URLs and model names for your LLM and UI-INS models
+   - Enter the API URLs and model names for your LLM and UI-Model models
    - Ensure API keys are set as environment variables if required
 
 2. Click "Initialize Session" to create a new session with your configuration
@@ -167,7 +167,7 @@ The application supports RAG functionality, allowing you to build an index from 
 
 1. Capture the current screen image
 2. Send a command to identify or interact with UI elements
-3. The UI-Ins model processes the image and identifies the requested UI element
+3. The UI-Model processes the image and identifies the requested UI element
 4. A rectangle is drawn around the detected element on the processed image
 5. The processed image is displayed in the "Proposed Action" panel
 
@@ -185,7 +185,7 @@ The application supports RAG functionality, allowing you to build an index from 
    - Check permissions for accessing screen capture
 
 3. **UI Element Detection Issues**:
-   - Ensure the UI-Ins model is properly configured
+   - Ensure the UI-Model is properly configured
    - Try using more specific commands to identify UI elements
 
 ### Logging

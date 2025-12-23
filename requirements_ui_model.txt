@@ -1,4 +1,4 @@
-# UI-Ins Server Dependencies
+# UI-Model Server Dependencies
 
 # Core ML/DL Libraries
 torch>=2.1.0

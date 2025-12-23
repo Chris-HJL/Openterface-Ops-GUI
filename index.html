@@ -193,12 +193,12 @@
                     <input type="text" id="model" placeholder="Enter LLM Model Name" value="qwen3-vl:32b">
                 </div>
                 <div class="config-item">
-                    <label for="ui-ins-api-url">UI-INS API URL:</label>
-                    <input type="text" id="ui-ins-api-url" placeholder="Enter UI-INS API URL" value="http://localhost:2345/v1/chat/completions">
+                    <label for="ui-model-api-url">UI-Model API URL:</label>
+                    <input type="text" id="ui-model-api-url" placeholder="Enter UI-Model API URL" value="http://localhost:2345/v1/chat/completions">
                 </div>
                 <div class="config-item">
-                    <label for="ui-ins-model">UI-INS Model:</label>
-                    <input type="text" id="ui-ins-model" placeholder="Enter UI-INS Model Name" value="ui-ins-7b">
+                    <label for="ui-model">UI-Model:</label>
+                    <input type="text" id="ui-model" placeholder="Enter UI-Model Name" value="fara-7b">
                 </div>
             </div>
             <div style="margin-top: 15px; padding: 15px; background-color: #f5f5f5; border-radius: 4px;">
@@ -206,7 +206,7 @@
                 <p>Please set the following environment variables before running the application:</p>
                 <ul style="list-style-type: disc; margin-left: 20px;">
                     <li><strong>LLM_API_KEY</strong>: API key for the main language model (default: "EMPTY")</li>
-                    <li><strong>UI_API_KEY</strong>: API key for the UI-Ins model (default: "EMPTY")</li>
+                    <li><strong>UI_API_KEY</strong>: API key for the UI-Model (default: "EMPTY")</li>
                 </ul>
                 <p>Example for Windows:</p>
                 <pre style="background-color: #e0e0e0; padding: 10px; border-radius: 4px; overflow-x: auto;">
@@ -260,8 +260,8 @@ export UI_API_KEY=your_ui_api_key</pre>
                 // Get configuration from input fields
                 const apiUrl = document.getElementById('api-url').value;
                 const model = document.getElementById('model').value;
-                const uiInsApiUrl = document.getElementById('ui-ins-api-url').value;
-                const uiInsModel = document.getElementById('ui-ins-model').value;
+                const uiModelApiUrl = document.getElementById('ui-model-api-url').value;
+                const uiModel = document.getElementById('ui-model').value;
                 
                 // Create session with configuration
                 const sessionResponse = await fetch(`${API_BASE_URL}/create-session`, {
@@ -273,8 +273,8 @@ export UI_API_KEY=your_ui_api_key</pre>
                         language: 'en',
                         api_url: apiUrl,
                         model: model,
-                        ui_ins_api_url: uiInsApiUrl,
-                        ui_ins_model: uiInsModel
+                        ui_model_api_url: uiModelApiUrl,
+                        ui_model: uiModel
                     })
                 });
                 
@@ -420,7 +420,7 @@ export UI_API_KEY=your_ui_api_key</pre>
                     if (data.success) {
                         const infoMessage = `API Status Information:<br>
 Main API Status: ${data.api_status}<br>
-UI-Ins API Status: ${data.ui_ins_status}`;
+UI-Model API Status: ${data.ui_model_status}`;
                         addMessage(infoMessage, 'assistant');
                     } else {
                         throw new Error('Failed to get API status');

@@ -54,8 +54,8 @@ class Session:
         # API configurations
         self.api_url = "http://localhost:11434/v1/chat/completions"
         self.model = "qwen3-vl:32b"
-        self.ui_ins_api_url = "http://localhost:2345/v1/chat/completions"
-        self.ui_ins_model = "ui-ins-7b"
+        self.ui_model_api_url = "http://localhost:2345/v1/chat/completions"
+        self.ui_model = "fara-7b"
         # Current image path for the session
         self.current_image_path = None
 
@@ -67,8 +67,8 @@ class CreateSessionRequest(BaseModel):
     language: Optional[str] = "en"
     api_url: Optional[str] = None
     model: Optional[str] = None
-    ui_ins_api_url: Optional[str] = None
-    ui_ins_model: Optional[str] = None
+    ui_model_api_url: Optional[str] = None
+    ui_model: Optional[str] = None
 
 class ChatRequest(BaseModel):
     session_id: str
@@ -82,11 +82,6 @@ class BuildIndexRequest(BaseModel):
     session_id: str
     docs_dir: Optional[str] = "./docs"
     index_dir: Optional[str] = "./index"
-
-class UIInsRequest(BaseModel):
-    session_id: str
-    image: str  # Base64 encoded image
-    instruction: str
 
 class SwitchLangRequest(BaseModel):
     session_id: str
@@ -124,15 +119,9 @@ class IndexResponse(BaseModel):
     message: str
     success: bool
 
-class UIInsResponse(BaseModel):
-    response: str
-    image: str  # Base64 encoded image with rectangle
-    coordinates: Dict[str, int]
-    success: bool
-
 class StatusResponse(BaseModel):
     api_status: str
-    ui_ins_status: str
+    ui_model_status: str
     success: bool
 
 class LangResponse(BaseModel):
@@ -187,10 +176,10 @@ async def create_session(request: CreateSessionRequest):
         session.api_url = request.api_url
     if request.model:
         session.model = request.model
-    if request.ui_ins_api_url:
-        session.ui_ins_api_url = request.ui_ins_api_url
-    if request.ui_ins_model:
-        session.ui_ins_model = request.ui_ins_model
+    if request.ui_model_api_url:
+        session.ui_model_api_url = request.ui_model_api_url
+    if request.ui_model:
+        session.ui_model = request.ui_model
     
     sessions[session_id] = session
     return SessionResponse(
@@ -263,25 +252,25 @@ async def chat(request: ChatRequest):
         updated_history.append({"role": "assistant", "content": response})
         session.conversation_history = updated_history
     
-    # Check for UI-Ins request
+    # Check for UI-Model request
     processed_image = None
     click_content = extract_click_content(response)
     if click_content and image_path:
-        # Process UI-Ins
+        # Process UI-Model
         try:
-            # Call UI-Ins API
-            ui_ins_response = call_ui_ins_api(
-                image_path, click_content, session.ui_ins_api_url, session.ui_ins_model
+            # Call UI-Model API
+            ui_model_response = call_ui_ins_api(
+                image_path, click_content, session.ui_model_api_url, session.ui_model
             )
             
             # Parse coordinates
-            point_x, point_y = parse_coordinates(ui_ins_response)
+            point_x, point_y = parse_coordinates(ui_model_response)
             
             if point_x != -1:
                 # Generate output image path
                 base_name = os.path.basename(image_path)
                 name, ext = os.path.splitext(base_name)
-                output_path = os.path.join("./output", f"{name}_ui_ins{ext}")
+                output_path = os.path.join("./output", f"{name}_ui_model{ext}")
 
                 # Default box size
                 box_size = 50
@@ -303,7 +292,7 @@ async def chat(request: ChatRequest):
                 # Convert to base64
                 processed_image = image_to_base64(output_path)
         except Exception as e:
-            print(f"UI-Ins processing error: {str(e)}")
+            print(f"UI-Model processing error: {str(e)}")
     
     # Clear current image path after processing
     session.current_image_path = None
@@ -337,51 +326,6 @@ async def build_index(request: BuildIndexRequest):
             success=False
         )
 
-@app.post("/ui-ins", response_model=UIInsResponse)
-async def ui_ins(request: UIInsRequest):
-    """UI element localization"""
-    # Get session
-    if request.session_id not in sessions:
-        raise HTTPException(status_code=404, detail="Session not found")
-    session = sessions[request.session_id]
-    
-    # Save base64 image
-    image_path = save_base64_image(request.image)
-    
-    # Call UI-Ins API
-    ui_ins_response = call_ui_ins_api(
-        image_path, request.instruction, session.ui_ins_api_url, session.ui_ins_model
-    )
-    
-    # Parse coordinates
-    point_x, point_y = parse_coordinates(ui_ins_response)
-    
-    if point_x != -1:
-        # Generate output image path
-        base_name = os.path.basename(image_path)
-        name, ext = os.path.splitext(base_name)
-        output_path = os.path.join("./output", f"{name}_ui_ins{ext}")
-        
-        # Draw rectangle
-        draw_rectangle(image_path, (point_x-20, point_y-20), (point_x+20, point_y+20), output_path)
-        
-        # Convert to base64
-        processed_image = image_to_base64(output_path)
-        
-        return UIInsResponse(
-            response=ui_ins_response,
-            image=processed_image,
-            coordinates={"x": point_x, "y": point_y},
-            success=True
-        )
-    else:
-        return UIInsResponse(
-            response="Failed to parse coordinates",
-            image="",
-            coordinates={"x": -1, "y": -1},
-            success=False
-        )
-
 @app.get("/status/{session_id}", response_model=StatusResponse)
 async def get_status(session_id: str):
     """Get API status"""
@@ -392,11 +336,11 @@ async def get_status(session_id: str):
     
     # Check API connections
     api_status = "Available" if test_api_connection(session.api_url) else "Unavailable"
-    ui_ins_status = "Available" if test_api_connection(session.ui_ins_api_url) else "Unavailable"
+    ui_model_status = "Available" if test_api_connection(session.ui_model_api_url) else "Unavailable"
     
     return StatusResponse(
         api_status=api_status,
-        ui_ins_status=ui_ins_status,
+        ui_model_status=ui_model_status,
         success=True
     )
 
@@ -526,7 +470,6 @@ async def root():
             "/chat",
             "/get-image",
             "/build-index",
-            "/ui-ins",
             "/status/{session_id}",
             "/switch-lang",
             "/toggle-rag",

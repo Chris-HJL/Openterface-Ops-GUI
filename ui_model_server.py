@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-UI-Ins Server
-Standalone UI-Ins model server with OpenAI-compatible API
+UI-Model Server
+Standalone UI-Model server with OpenAI-compatible API
 """
 
 import requests
@@ -19,10 +19,11 @@ from transformers import AutoProcessor, Qwen2_5_VLForConditionalGeneration
 from typing import Dict, Any, Optional
 from flask import Flask, request, jsonify
 
-# UI-Ins model global variables
-UI_INS_MODEL_PATH = "D:\\AI\\models\\UI-Ins-7B"
-ui_ins_model = None
-ui_ins_processor = None
+# UI-Model global variables
+UI_MODEL_PATH = "D:\\AI\\models\\Fara-7B"
+# UI_MODEL_PATH = "D:\\AI\\models\\UI-Ins-7B"
+ui_model = None
+ui_processor = None
 standby_mode = "cold"  # Default cold standby mode
 
 app = Flask(__name__)
@@ -53,24 +54,24 @@ def parse_coordinates(raw_string: str) -> tuple[int, int]:
 
 
 
-def load_ui_ins_model(model_path: str = UI_INS_MODEL_PATH):
+def load_ui_model(model_path: str = UI_MODEL_PATH):
     """
-    Load UI-Ins model
+    Load UI-Model
     """
-    global ui_ins_model, ui_ins_processor
-    print("Loading UI-Ins model...")
-    ui_ins_model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+    global ui_model, ui_processor
+    print("Loading UI-Model...")
+    ui_model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
         model_path,
         torch_dtype=torch.bfloat16,
         device_map="auto"
     ).eval()
-    ui_ins_processor = AutoProcessor.from_pretrained(model_path)
-    print("UI-Ins model loaded successfully")
+    ui_processor = AutoProcessor.from_pretrained(model_path)
+    print("UI-Model loaded successfully")
 
 
-def run_ui_ins_inference(image_path: str, instruction: str) -> tuple[int, int]:
+def run_ui_model_inference(image_path: str, instruction: str) -> tuple[int, int]:
     """
-    Run UI-Ins model inference to get coordinates
+    Run UI-Model inference to get coordinates
     
     Args:
         image_path: Path to the image
@@ -79,11 +80,11 @@ def run_ui_ins_inference(image_path: str, instruction: str) -> tuple[int, int]:
     Returns:
         Coordinate point (x, y)
     """
-    global ui_ins_model, ui_ins_processor
+    global ui_model, ui_processor
     
     # Check if model is already loaded
-    if ui_ins_model is None or ui_ins_processor is None:
-        load_ui_ins_model()
+    if ui_model is None or ui_processor is None:
+        load_ui_model()
     
     # Load image
     image = Image.open(image_path).convert("RGB")
@@ -103,13 +104,13 @@ def run_ui_ins_inference(image_path: str, instruction: str) -> tuple[int, int]:
         }]
     
     # Process input
-    prompt = ui_ins_processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-    inputs = ui_ins_processor(text=[prompt], images=[image], return_tensors="pt").to(ui_ins_model.device)
+    prompt = ui_processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    inputs = ui_processor(text=[prompt], images=[image], return_tensors="pt").to(ui_model.device)
     
     # Generate response
-    generated_ids = ui_ins_model.generate(**inputs, max_new_tokens=128)
+    generated_ids = ui_model.generate(**inputs, max_new_tokens=128)
     response_ids = generated_ids[0, len(inputs["input_ids"][0]):]
-    raw_response = ui_ins_processor.decode(response_ids, skip_special_tokens=True)
+    raw_response = ui_processor.decode(response_ids, skip_special_tokens=True)
     print(f"\nRaw model response: {raw_response}")
     
     # Parse coordinates
@@ -122,34 +123,34 @@ def cleanup_model():
     """
     Clean up model resources when program exits
     """
-    global ui_ins_model, ui_ins_processor
-    if ui_ins_model is not None or ui_ins_processor is not None:
+    global ui_model, ui_processor
+    if ui_model is not None or ui_processor is not None:
         print("Program exiting, cleaning up model resources...")
-        if ui_ins_model is not None:
-            ui_ins_model = None
-        if ui_ins_processor is not None:
-            ui_ins_processor = None
+        if ui_model is not None:
+            ui_model = None
+        if ui_processor is not None:
+            ui_processor = None
         # Force release GPU memory
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
         print("Model resources cleaned up successfully")
 
 
-def unload_ui_ins_model():
+def unload_ui_model():
     """
-    Unload UI-Ins model and release resources
+    Unload UI-Model and release resources
     """
-    global ui_ins_model, ui_ins_processor
-    print("Unloading UI-Ins model...")
-    if ui_ins_model is not None:
+    global ui_model, ui_processor
+    print("Unloading UI-Model...")
+    if ui_model is not None:
         # Clear model and release GPU memory
-        ui_ins_model = None
-    if ui_ins_processor is not None:
-        ui_ins_processor = None
+        ui_model = None
+    if ui_processor is not None:
+        ui_processor = None
     # Force release GPU memory
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
-    print("UI-Ins model has been unloaded")
+    print("UI-Model has been unloaded")
 
 
 def process_ui_element_request(image_path: str, instruction: str) -> Dict[str, Any]:
@@ -158,8 +159,8 @@ def process_ui_element_request(image_path: str, instruction: str) -> Dict[str, A
     """
     print(f"\nLocating element: {instruction}")
     
-    # Run UI-Ins model inference (will automatically load model if not loaded)
-    point_x, point_y = run_ui_ins_inference(image_path, instruction)
+    # Run UI-Model inference (will automatically load model if not loaded)
+    point_x, point_y = run_ui_model_inference(image_path, instruction)
     
     if point_x != -1:
         print(f"Element located successfully at coordinates: ({point_x}, {point_y})")
@@ -225,7 +226,7 @@ def chat_completions():
                         image_bytes = base64.b64decode(base64_data)
                         # Create temporary image file
                         timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-                        temp_image_path = f"./temp_images/ui_ins_temp_{timestamp}.jpg"
+                        temp_image_path = f"./temp_images/ui_model_temp_{timestamp}.jpg"
                         os.makedirs("./temp_images", exist_ok=True)
                         with open(temp_image_path, 'wb') as f:
                             f.write(image_bytes)
@@ -260,7 +261,7 @@ def chat_completions():
         # Decide whether to unload model based on standby mode
         if standby_mode == "cold":
             # Cold standby mode: unload model after each request
-            unload_ui_ins_model()
+            unload_ui_model()
         # Hot standby mode: keep model loaded
         
         # Generate response
@@ -273,7 +274,7 @@ def chat_completions():
             "id": f"chatcmpl-{datetime.datetime.now().timestamp()}",
             "object": "chat.completion",
             "created": int(datetime.datetime.now().timestamp()),
-            "model": "ui-ins-7b",
+            "model": "ui-model-7b",
             "choices": [
                 {
                     "index": 0,
@@ -297,7 +298,7 @@ def chat_completions():
         # Decide whether to unload model based on standby mode
         if standby_mode == "cold":
             # Cold standby mode: unload model even when exception occurs
-            unload_ui_ins_model()
+            unload_ui_model()
         # Hot standby mode: keep model loaded
         return jsonify({
             "error": {
@@ -317,11 +318,11 @@ def get_models():
         "object": "list",
         "data": [
             {
-                "id": "ui-ins-7b",
+                "id": "ui-model-7b",
                 "object": "model",
                 "created": int(datetime.datetime.now().timestamp()),
-                "owned_by": "ui-ins",
-                "root": "ui-ins-7b",
+                "owned_by": "ui-model",
+                "root": "ui-model-7b",
                 "parent": None,
                 "permission": []
             }
@@ -335,8 +336,8 @@ def health_check():
     """
     return jsonify({
         "status": "ok",
-        "message": "UI-Ins Server is running",
-        "model_loaded": ui_ins_model is not None,
+        "message": "UI-Model Server is running",
+        "model_loaded": ui_model is not None,
         "standby_mode": standby_mode
     })
 
@@ -351,7 +352,7 @@ def main():
     global standby_mode
     
     # Parse command line arguments
-    parser = argparse.ArgumentParser(description="UI-Ins Server - Standalone UI-Ins model server")
+    parser = argparse.ArgumentParser(description="UI-Model Server - Standalone UI-Model server")
     parser.add_argument(
         "--standby-mode", 
         choices=["cold", "hot"], 
@@ -371,8 +372,8 @@ def main():
     )
     parser.add_argument(
         "--model-path", 
-        default=UI_INS_MODEL_PATH,
-        help=f"UI-Ins model path (default: {UI_INS_MODEL_PATH})"
+        default=UI_MODEL_PATH,
+        help=f"UI-Model path (default: {UI_MODEL_PATH})"
     )
     
     args = parser.parse_args()
@@ -387,7 +388,7 @@ def main():
     if standby_mode == "hot":
         print(f"Hot standby mode: Preloading model...")
         try:
-            load_ui_ins_model(args.model_path)
+            load_ui_model(args.model_path)
             print("Model preloaded successfully")
         except Exception as e:
             print(f"Failed to preload model: {e}")
@@ -399,7 +400,7 @@ def main():
     print(f"Standby mode: {standby_mode}")
     
     # Start server
-    print(f"\nUI-Ins Server is running on http://{args.host}:{args.port}")
+    print(f"\nUI-Model Server is running on http://{args.host}:{args.port}")
     print("Available endpoints:")
     print(f"  GET  http://{args.host}:{args.port}/health")
     print(f"  GET  http://{args.host}:{args.port}/v1/models")
