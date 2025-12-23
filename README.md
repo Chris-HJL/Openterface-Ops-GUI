@@ -41,7 +41,7 @@ cd Openterface-Ops-GUI
 
 ```bash
 pip install -r requirements_ops_cli.txt
-pip install -r requirements_ui_ins.txt #only when you want to deploy the UI model locally.
+pip install -r requirements_ui_model.txt #only when you want to deploy the UI model locally.
 ```
 
 3. Set environment variables for API keys (for online model only, depending on your model setup):
@@ -144,7 +144,6 @@ The backend provides the following API endpoints:
 | `/chat` | POST | Handle chat requests with optional image |
 | `/get-image` | POST | Get the latest image from the server |
 | `/build-index` | POST | Build RAG index from documents |
-| `/ui-ins` | POST | UI element localization and interaction |
 | `/status/{session_id}` | GET | Get API status information |
 | `/switch-lang` | POST | Switch language for the session |
 | `/toggle-rag` | POST | Toggle RAG functionality |
