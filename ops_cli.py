@@ -584,7 +584,7 @@ def draw_rectangle(image_path, top_left, bottom_right, output_path=None):
     draw = ImageDraw.Draw(img)
     
     # Draw rectangle
-    draw.rectangle([top_left, bottom_right], outline="red", width=2)
+    draw.rectangle([top_left, bottom_right], outline="red", width=3)
     
     # Save image
     if output_path is None:
@@ -702,9 +702,23 @@ def process_ui_element_request(image_path: str, instruction: str, ui_ins_api_url
         base_name = os.path.basename(image_path)
         name, ext = os.path.splitext(base_name)
         output_path = os.path.join("./output", f"{name}_ui_ins{ext}")
+
+                        # Default box size
+        box_size = 50
+        left = point_x - box_size // 2
+        top = point_y - box_size // 2
+        right = point_x + box_size // 2
+        bottom = point_y + box_size // 2
+
+        # Ensure box is within image bounds
+        width, height = image.size
+        left = max(0, left)
+        top = max(0, top)
+        right = min(width - 1, right)
+        bottom = min(height - 1, bottom)
         
         # Draw rectangle
-        draw_rectangle(image_path, (point_x-20, point_y-20), (point_x+20, point_y+20), output_path)
+        draw_rectangle(image_path, (left, top), (right, bottom), output_path)
         
         print(f"\n✅ Element localization completed:")
         print(f"   Localized element: {instruction}")

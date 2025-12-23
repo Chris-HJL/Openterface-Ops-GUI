@@ -11,6 +11,7 @@ from typing import Dict, Any, Optional, List
 from fastapi import FastAPI, HTTPException, staticfiles
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
+from PIL import Image
 
 # Import functions from ops_cli.py
 import sys
@@ -281,9 +282,23 @@ async def chat(request: ChatRequest):
                 base_name = os.path.basename(image_path)
                 name, ext = os.path.splitext(base_name)
                 output_path = os.path.join("./output", f"{name}_ui_ins{ext}")
+
+                # Default box size
+                box_size = 50
+                left = point_x - box_size // 2
+                top = point_y - box_size // 2
+                right = point_x + box_size // 2
+                bottom = point_y + box_size // 2
+
+                # Ensure box is within image bounds
+                width, height = Image.open(image_path).size
+                left = max(0, left)
+                top = max(0, top)
+                right = min(width - 1, right)
+                bottom = min(height - 1, bottom)
                 
                 # Draw rectangle
-                draw_rectangle(image_path, (point_x-20, point_y-20), (point_x+20, point_y+20), output_path)
+                draw_rectangle(image_path, (left, top), (right, bottom), output_path)   
                 
                 # Convert to base64
                 processed_image = image_to_base64(output_path)
