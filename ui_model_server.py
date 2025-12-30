@@ -111,8 +111,8 @@ def run_ui_model_inference(image_path: str, instruction: str) -> tuple[int, int]
     # Generate response
     generated_ids = ui_model.generate(
         **inputs,
-        # max_new_tokens=128,
-        temperature=0.0,
+        max_new_tokens=200,
+        # temperature=0.0,
         # top_p=1.0,
         # top_k=-1,
     )
