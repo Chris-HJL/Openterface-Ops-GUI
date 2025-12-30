@@ -15,7 +15,7 @@ import atexit
 import signal
 import sys
 from PIL import Image, ImageDraw
-from transformers import AutoProcessor, Qwen2_5_VLForConditionalGeneration
+from transformers import AutoProcessor, Qwen2_5_VLForConditionalGeneration, Qwen3VLForConditionalGeneration
 from typing import Dict, Any, Optional
 from flask import Flask, request, jsonify
 
@@ -63,7 +63,8 @@ def load_ui_model(model_path: str = UI_MODEL_PATH):
     ui_model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
         model_path,
         torch_dtype=torch.bfloat16,
-        device_map="auto"
+        device_map="auto",
+        # attn_implementation="flash_attention_2",
     ).eval()
     ui_processor = AutoProcessor.from_pretrained(model_path)
     print("UI-Model loaded successfully")
@@ -108,7 +109,13 @@ def run_ui_model_inference(image_path: str, instruction: str) -> tuple[int, int]
     inputs = ui_processor(text=[prompt], images=[image], return_tensors="pt").to(ui_model.device)
     
     # Generate response
-    generated_ids = ui_model.generate(**inputs, max_new_tokens=128)
+    generated_ids = ui_model.generate(
+        **inputs,
+        # max_new_tokens=128,
+        temperature=0.0,
+        # top_p=1.0,
+        # top_k=-1,
+    )
     response_ids = generated_ids[0, len(inputs["input_ids"][0]):]
     raw_response = ui_processor.decode(response_ids, skip_special_tokens=True)
     print(f"\nRaw model response: {raw_response}")
@@ -274,7 +281,7 @@ def chat_completions():
             "id": f"chatcmpl-{datetime.datetime.now().timestamp()}",
             "object": "chat.completion",
             "created": int(datetime.datetime.now().timestamp()),
-            "model": "ui-model-7b",
+            "model": "ui-model",
             "choices": [
                 {
                     "index": 0,
