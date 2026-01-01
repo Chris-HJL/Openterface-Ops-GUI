@@ -4,8 +4,6 @@ UI-Model Server
 Standalone UI-Model server with OpenAI-compatible API
 """
 
-import requests
-import json
 import os
 import datetime
 import re
@@ -14,9 +12,9 @@ import argparse
 import atexit
 import signal
 import sys
-from PIL import Image, ImageDraw
-from transformers import AutoProcessor, Qwen2_5_VLForConditionalGeneration, Qwen3VLForConditionalGeneration
-from typing import Dict, Any, Optional
+from PIL import Image
+from transformers import AutoProcessor, Qwen2_5_VLForConditionalGeneration
+from typing import Dict, Any
 from flask import Flask, request, jsonify
 
 # UI-Model global variables
@@ -111,7 +109,7 @@ def run_ui_model_inference(image_path: str, instruction: str) -> tuple[int, int]
     # Generate response
     generated_ids = ui_model.generate(
         **inputs,
-        max_new_tokens=200,
+        max_new_tokens=128,
         # temperature=0.0,
         # top_p=1.0,
         # top_k=-1,
