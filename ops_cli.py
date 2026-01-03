@@ -332,20 +332,22 @@ def get_api_response(prompt: str, api_url: str = "http://localhost:11434/v1/chat
                             Use the same language as user types.
                         # Task:
                             Suggest the next action to perform based on the user instruction/query and the UI elements shown in the image.
+                        # Available Actions:
+                            - Click
+                            - Double Click
+                            - Input
+                            - Keyboard
                         # Output Format:
                             - Enclose your response with <Answer>Your response</Answer>.
                             - Enclose the action to perform with <action></action>, e.g. <action>Click</action>, <action>Keyboard [Left]</action>.
                             - Enclose the element name with <element></element> where the action should be performed, e.g. <element>OK Button</element>.
                             - Enclose the text to input with <input></input> if the action is Input, e.g. <input>Hello World</input>.
-                            - Enclose the brief description of the action with <final_reasoning></final_reasoning>, e.g. <final_reasoning>Click the OK Button to confirm</final_reasoning>.
-                        # Available Actions:
-                            - Click
-                            - Double Click
-                            - Input
-                            - Keyboard [the key to press], e.g. <action>Keyboard [Left]</action>, <action>Keyboard [Enter]</action>.
+                            - Enclose the key to press with <key></key> if the action is Keyboard, e.g. <key>Left</key>, <key>Enter</key>.
+                            - Enclose the brief explanation of what needs to be done next with <reasoning></reasoning>, e.g. <reasoning>Click the OK Button to confirm</reasoning>.
                         # Scenario:
                             - If it is in BIOS, only use Keyboard action, unless there is a mouse cursor shown in the image.
                             - To open an app with desktop icon, use <action>Double Click</action> on the icon.
+                            - Before using Input action, make sure the text box is focused. If not, use <action>Click</action> to focus it.
                     """
                 })
             else:

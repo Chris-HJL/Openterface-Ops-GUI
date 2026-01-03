@@ -191,7 +191,7 @@ def extract_action_and_element(text: str) -> tuple:
         text: Response text containing <action> and <element> tags
         
     Returns:
-        Tuple of (action, element) where each can be None if not found
+        Tuple of (action, element, input_content, key_content) where each can be None if not found
     """
     import re
     
@@ -205,7 +205,17 @@ def extract_action_and_element(text: str) -> tuple:
     element_matches = re.findall(element_pattern, text, re.DOTALL)
     element = element_matches[0].strip() if element_matches else None
     
-    return (action, element)
+    # Extract input content
+    input_pattern = r'<input>(.*?)</input>'
+    input_matches = re.findall(input_pattern, text, re.DOTALL)
+    input_content = input_matches[0].strip() if input_matches else None
+    
+    # Extract key content
+    key_pattern = r'<key>(.*?)</key>'
+    key_matches = re.findall(key_pattern, text, re.DOTALL)
+    key_content = key_matches[0].strip() if key_matches else None
+    
+    return (action, element, input_content, key_content)
 
 # API endpoints
 @app.post("/create-session", response_model=SessionResponse)
@@ -302,7 +312,8 @@ async def chat(request: ChatRequest):
     
     # Check for UI-Model request
     processed_image = None
-    action, element = extract_action_and_element(response)
+    action, element, input_content, key_content = extract_action_and_element(response)
+    
     if action in ["Click", "Double Click"] and element and image_path:
         # Process UI-Model
         try:
@@ -352,6 +363,16 @@ async def chat(request: ChatRequest):
                     send_script_command(script_command)
         except Exception as e:
             print(f"UI-Model processing error: {str(e)}")
+    elif action == "Input" and input_content:
+        # Process Input action - send text directly
+        script_command = f'Send "{input_content}"'
+        send_script_command(script_command)
+        print(f"[Session {request.session_id}] Executed Input: {input_content}")
+    elif action == "Keyboard" and key_content:
+        # Process Keyboard action - send key command
+        script_command = f'Send "{{{key_content}}}"'
+        send_script_command(script_command)
+        print(f"[Session {request.session_id}] Executed Keyboard: {key_content}")
     
     # Clear current image path after processing
     session.current_image_path = None
@@ -575,14 +596,14 @@ async def react(request: ReactRequest):
                 Please analyze the current screen and determine if the task has been completed.
                 Respond with one of the following:
                 - <task_status>completed</task_status> if the task is done
-                - <task_status>in_progress</task_status> if the task is not yet completed
+                - <task_status>in_progress</task_status> if the task is not yet completed or the screen may still be loading
 
-                If not completed, also provide:
+                If the screen may still be loading, no other information is needed.
+                Else if not completed, also provide:
                 - <action>Click</action> or <action>Double Click</action> or <action>none</action>
                 - <element>description of UI element to interact with</element> (if action is Click or Double Click)
                 - <reasoning>brief explanation of what needs to be done next</reasoning>
-
-                If completed, also provide:
+                Else if completed, also provide:
                 - <final_reasoning>brief explanation of the task completion</final_reasoning>
             """
             
@@ -626,7 +647,7 @@ async def react(request: ReactRequest):
                 )
             
             # Extract action and element for next step
-            action, element = extract_action_and_element(response)
+            action, element, input_content, key_content = extract_action_and_element(response)
             
             # Process UI-Model and execute action if needed
             processed_image = None
@@ -680,10 +701,20 @@ async def react(request: ReactRequest):
                             print(f"[ReAct Session {request.session_id}] Executed {action} at ({point_x}, {point_y})")
                 except Exception as e:
                     print(f"[ReAct Session {request.session_id}] UI-Model processing error: {str(e)}")
+            elif action == "Input" and input_content:
+                # Process Input action - send text directly
+                script_command = f'Send "{input_content}"'
+                send_script_command(script_command)
+                print(f"[ReAct Session {request.session_id}] Executed Input: {input_content}")
+            elif action == "Keyboard" and key_content:
+                # Process Keyboard action - send key command
+                script_command = f'Send "{{{key_content}}}"'
+                send_script_command(script_command)
+                print(f"[ReAct Session {request.session_id}] Executed Keyboard: {key_content}")
             
-            # Wait 1 second before next iteration
+            # Wait 3 seconds before next iteration
             import time
-            time.sleep(2)
+            time.sleep(3)
         
         # Max iterations reached
         session.react_is_running = False
