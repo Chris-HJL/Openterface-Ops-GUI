@@ -314,7 +314,7 @@ async def chat(request: ChatRequest):
     processed_image = None
     action, element, input_content, key_content = extract_action_and_element(response)
     
-    if action in ["Click", "Double Click"] and element and image_path:
+    if action in ["Click", "Double Click", "Right Click"] and element and image_path:
         # Process UI-Model
         try:
             # Call UI-Model API with element content
@@ -356,6 +356,8 @@ async def chat(request: ChatRequest):
                     script_command = f'Send "{{Click {point_x}, {point_y}}}"'
                 elif action == "Double Click":
                     script_command = f'Send "{{Click {point_x}, {point_y}}}"\nSend "{{Click {point_x}, {point_y}}}"'
+                elif action == "Right Click":
+                    script_command = f'Send "{{Click {point_x}, {point_y} Right}}"'
                 else:
                     script_command = None
                 
@@ -651,7 +653,7 @@ async def react(request: ReactRequest):
             
             # Process UI-Model and execute action if needed
             processed_image = None
-            if action in ["Click", "Double Click"] and element and image_path:
+            if action in ["Click", "Double Click", "Right Click"] and element and image_path:
                 try:
                     # Call UI-Model API with element content
                     ui_model_response = call_ui_ins_api(
@@ -693,6 +695,8 @@ async def react(request: ReactRequest):
                             script_command = f'Send "{{Click {point_x}, {point_y}}}"'
                         elif action == "Double Click":
                             script_command = f'Send "{{Click {point_x}, {point_y}}}"\nSend "{{Click {point_x}, {point_y}}}"'
+                        elif action == "Right Click":
+                            script_command = f'Send "{{Click {point_x}, {point_y} Right}}"'
                         else:
                             script_command = None
                         

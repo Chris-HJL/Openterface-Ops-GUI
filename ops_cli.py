@@ -335,6 +335,7 @@ def get_api_response(prompt: str, api_url: str = "http://localhost:11434/v1/chat
                         # Available Actions:
                             - Click
                             - Double Click
+                            - Right Click
                             - Input
                             - Keyboard
                         # Output Format:
