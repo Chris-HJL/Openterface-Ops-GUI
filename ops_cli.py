@@ -575,6 +575,61 @@ def get_last_image_from_server(host: str = 'localhost', port: int = 12345, outpu
         return _("image_server.unknown_error", error=str(e))
 
 
+def send_script_command(command: str, host: str = 'localhost', port: int = 12345, timeout: int = 10) -> bool:
+    """
+    Send script command to Openterface server
+    
+    Args:
+        command: Script command to send
+        host: Server host
+        port: Server port
+        timeout: Connection timeout
+        
+    Returns:
+        True if command sent successfully, False otherwise
+    """
+    try:
+        # Log function
+        def log(message):
+            timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            print(f"[{timestamp}] {message}")
+        
+        log(f"Connecting to script: {host}:{port}")
+        
+        # Create TCP connection
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_socket.settimeout(timeout)
+        
+        # Connect to server
+        client_socket.connect((host, port))
+        log(f"Connected to server: {host}:{port}")
+        
+        # Send command
+        client_socket.send(command.encode('utf-8'))
+        log(f"Sent script command: {command}")
+        
+        # Receive response
+        response = client_socket.recv(4096)
+        response_str = response.decode('utf-8', errors='ignore')
+        log(f"Server response: {response_str}")
+        
+        # Close connection
+        client_socket.close()
+        log("Connection closed")
+        
+        return True
+        
+    except socket.timeout:
+        log("Connection timeout")
+        return False
+    except ConnectionRefusedError:
+        log("Connection refused")
+        return False
+    except Exception as e:
+        log(f"Error sending script command: {str(e)}")
+        return False
+
+
 def extract_click_content(text: str) -> Optional[str]:
     """
     Extract content from <click> tags in text

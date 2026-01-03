@@ -21,7 +21,7 @@ from ops_cli import (
     setup_llamaindex, build_index_from_docs, load_index, retrieve_relevant_docs,
     test_api_connection, get_api_response, get_last_image_from_server,
     extract_click_content, draw_rectangle, parse_coordinates,
-    call_ui_ins_api, process_ui_element_request
+    call_ui_ins_api, process_ui_element_request, send_script_command
 )
 
 # Create FastAPI app
@@ -58,6 +58,12 @@ class Session:
         self.ui_model = "fara-7b"
         # Current image path for the session
         self.current_image_path = None
+        # ReAct agent configurations
+        self.react_enabled = False
+        self.react_max_iterations = 10
+        self.react_current_iteration = 0
+        self.react_task_description = None
+        self.react_is_running = False
 
 # Sessions dictionary
 sessions: Dict[str, Session] = {}
@@ -97,6 +103,16 @@ class ClearHistoryRequest(BaseModel):
 class GetImageRequest(BaseModel):
     session_id: str
 
+class ReactRequest(BaseModel):
+    session_id: str
+    task: str
+    max_iterations: Optional[int] = 10
+    rag_enabled: Optional[bool] = None
+    model: Optional[str] = None
+
+class StopReactRequest(BaseModel):
+    session_id: str
+
 # Response models
 class SessionResponse(BaseModel):
     session_id: str
@@ -133,6 +149,13 @@ class ToggleResponse(BaseModel):
     message: str
     current_state: bool
     success: bool
+
+class ReactResponse(BaseModel):
+    message: str
+    iterations_completed: int
+    final_status: str
+    success: bool
+    images: Optional[List[str]] = None  # List of base64 images from each iteration
 
 # Helper functions
 def save_base64_image(base64_str: str) -> str:
@@ -316,6 +339,17 @@ async def chat(request: ChatRequest):
                 
                 # Convert to base64
                 processed_image = image_to_base64(output_path)
+
+                # Build and send script command to server
+                if action == "Click":
+                    script_command = f'Send "{{Click {point_x}, {point_y}}}"'
+                elif action == "Double Click":
+                    script_command = f'Send "{{Click {point_x}, {point_y}}}"\nSend "{{Click {point_x}, {point_y}}}"'
+                else:
+                    script_command = None
+                
+                if script_command:
+                    send_script_command(script_command)
         except Exception as e:
             print(f"UI-Model processing error: {str(e)}")
     
@@ -484,6 +518,206 @@ async def get_image(request: GetImageRequest):
             success=False
         )
 
+@app.post("/react", response_model=ReactResponse)
+async def react(request: ReactRequest):
+    """Start ReAct agent mode to autonomously complete a task"""
+    # Get session
+    if request.session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    session = sessions[request.session_id]
+    
+    # Check if already running
+    if session.react_is_running:
+        return ReactResponse(
+            message="ReAct agent is already running",
+            iterations_completed=0,
+            final_status="already_running",
+            success=False
+        )
+    
+    # Initialize ReAct mode
+    session.react_enabled = True
+    session.react_max_iterations = request.max_iterations
+    session.react_current_iteration = 0
+    session.react_task_description = request.task
+    session.react_is_running = True
+    
+    # Use session or request model and RAG setting
+    model = request.model or session.model
+    rag_enabled = request.rag_enabled if request.rag_enabled is not None else session.rag_enabled
+    
+    # Store images from each iteration
+    iteration_images = []
+    
+    try:
+        while session.react_is_running and session.react_current_iteration < session.react_max_iterations:
+            session.react_current_iteration += 1
+            iteration_num = session.react_current_iteration
+            
+            print(f"[ReAct Session {request.session_id}] Iteration {iteration_num}/{session.react_max_iterations}")
+            
+            # Get latest image from server
+            image_path = get_last_image_from_server()
+            if image_path and not image_path.startswith("./images"):
+                return ReactResponse(
+                    message=f"Failed to get image from server: {image_path}",
+                    iterations_completed=iteration_num - 1,
+                    final_status="error",
+                    success=False,
+                    images=iteration_images
+                )
+            
+            # Build prompt for task completion check
+            check_prompt = f"""Task: {session.react_task_description}
+
+                Current iteration: {iteration_num}/{session.react_max_iterations}
+
+                Please analyze the current screen and determine if the task has been completed.
+                Respond with one of the following:
+                - <task_status>completed</task_status> if the task is done
+                - <task_status>in_progress</task_status> if the task is not yet completed
+
+                If not completed, also provide:
+                - <action>Click</action> or <action>Double Click</action> or <action>none</action>
+                - <element>description of UI element to interact with</element> (if action is Click or Double Click)
+                - <reasoning>brief explanation of what needs to be done next</reasoning>
+
+                If completed, also provide:
+                - <final_reasoning>brief explanation of the task completion</final_reasoning>
+            """
+            
+            # Retrieve relevant docs if RAG enabled
+            retrieved_docs = []
+            if rag_enabled:
+                retrieved_docs = retrieve_relevant_docs(session.react_task_description)
+            
+            # Get LLM response for task completion check
+            response = get_api_response(
+                check_prompt, session.api_url, model, image_path,
+                retrieved_docs=retrieved_docs
+            )
+            print(f"[ReAct Session {request.session_id}] LLM response: {response}")
+            
+            # Check if task is completed
+            task_status_pattern = r'<task_status>(.*?)</task_status>'
+            task_status_matches = [m.strip() for m in __import__('re').findall(task_status_pattern, response, __import__('re').DOTALL)]
+            task_status = task_status_matches[0] if task_status_matches else "in_progress"
+            
+            if task_status == "completed":
+                print(f"[ReAct Session {request.session_id}] Task completed at iteration {iteration_num}")
+                session.react_is_running = False
+                return ReactResponse(
+                    message=f"Task completed successfully in {iteration_num} iterations",
+                    iterations_completed=iteration_num,
+                    final_status="completed",
+                    success=True,
+                    images=iteration_images
+                )
+            
+            # Extract action and element for next step
+            action, element = extract_action_and_element(response)
+            
+            # Process UI-Model and execute action if needed
+            processed_image = None
+            if action in ["Click", "Double Click"] and element and image_path:
+                try:
+                    # Call UI-Model API with element content
+                    ui_model_response = call_ui_ins_api(
+                        image_path, element, session.ui_model_api_url, session.ui_model
+                    )
+                    
+                    # Parse coordinates
+                    point_x, point_y = parse_coordinates(ui_model_response)
+                    
+                    if point_x != -1:
+                        # Generate output image path
+                        base_name = os.path.basename(image_path)
+                        name, ext = os.path.splitext(base_name)
+                        output_path = os.path.join("./output", f"{name}_react_iter{iteration_num}{ext}")
+
+                        # Default box size
+                        box_size = 50
+                        left = point_x - box_size // 2
+                        top = point_y - box_size // 2
+                        right = point_x + box_size // 2
+                        bottom = point_y + box_size // 2
+
+                        # Ensure box is within image bounds
+                        width, height = Image.open(image_path).size
+                        left = max(0, left)
+                        top = max(0, top)
+                        right = min(width - 1, right)
+                        bottom = min(height - 1, bottom)
+                        
+                        # Draw rectangle
+                        draw_rectangle(image_path, (left, top), (right, bottom), output_path)   
+                        
+                        # Convert to base64 and store
+                        processed_image = image_to_base64(output_path)
+                        iteration_images.append(processed_image)
+
+                        # Build and send script command to server
+                        if action == "Click":
+                            script_command = f'Send "{{Click {point_x}, {point_y}}}"'
+                        elif action == "Double Click":
+                            script_command = f'Send "{{Click {point_x}, {point_y}}}"\nSend "{{Click {point_x}, {point_y}}}"'
+                        else:
+                            script_command = None
+                        
+                        if script_command:
+                            send_script_command(script_command)
+                            print(f"[ReAct Session {request.session_id}] Executed {action} at ({point_x}, {point_y})")
+                except Exception as e:
+                    print(f"[ReAct Session {request.session_id}] UI-Model processing error: {str(e)}")
+            
+            # Wait 1 second before next iteration
+            import time
+            time.sleep(2)
+        
+        # Max iterations reached
+        session.react_is_running = False
+        return ReactResponse(
+            message=f"Reached maximum iterations ({session.react_max_iterations}) without completing task",
+            iterations_completed=session.react_max_iterations,
+            final_status="max_iterations_reached",
+            success=False,
+            images=iteration_images
+        )
+    
+    except Exception as e:
+        session.react_is_running = False
+        print(f"[ReAct Session {request.session_id}] Error: {str(e)}")
+        return ReactResponse(
+            message=f"ReAct agent encountered an error: {str(e)}",
+            iterations_completed=session.react_current_iteration,
+            final_status="error",
+            success=False,
+            images=iteration_images
+        )
+
+@app.post("/stop-react", response_model=SessionResponse)
+async def stop_react(request: StopReactRequest):
+    """Stop the running ReAct agent"""
+    # Get session
+    if request.session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    session = sessions[request.session_id]
+    
+    # Stop ReAct agent
+    if session.react_is_running:
+        session.react_is_running = False
+        return SessionResponse(
+            session_id=request.session_id,
+            message="ReAct agent stopped successfully",
+            success=True
+        )
+    else:
+        return SessionResponse(
+            session_id=request.session_id,
+            message="ReAct agent is not running",
+            success=False
+        )
+
 @app.get("/")
 async def root():
     """Root endpoint"""
@@ -499,7 +733,9 @@ async def root():
             "/switch-lang",
             "/toggle-rag",
             "/toggle-multiturn",
-            "/clear-history"
+            "/clear-history",
+            "/react",
+            "/stop-react"
         ]
     }
 

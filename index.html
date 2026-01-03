@@ -174,6 +174,108 @@
             color: #666;
             font-style: italic;
         }
+        
+        .react-section {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            display: none;
+        }
+        
+        .react-section.active {
+            display: block;
+        }
+        
+        .react-status {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .react-progress {
+            flex: 1;
+            margin-right: 20px;
+        }
+        
+        .progress-bar {
+            height: 20px;
+            background-color: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 5px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background-color: #4CAF50;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+        
+        .progress-text {
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .react-images {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+        
+        .react-image-item {
+            flex: 0 0 auto;
+            text-align: center;
+        }
+        
+        .react-image-item img {
+            max-width: 200px;
+            height: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .react-image-item span {
+            display: block;
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .stop-btn {
+            background-color: #f44336;
+        }
+        
+        .stop-btn:hover {
+            background-color: #d32f2f;
+        }
+        
+        .final-reasoning {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        
+        .final-reasoning strong {
+            color: #856404;
+            display: block;
+            margin-bottom: 8px;
+        }
+        
+        .final-reasoning p {
+            margin: 0;
+            color: #666;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
     </style>
 </head>
 <body>
@@ -235,6 +337,22 @@ export UI_API_KEY=your_ui_api_key</pre>
             </div>
         </div>
         
+        <!-- ReAct Agent Section -->
+        <div class="react-section" id="react-section">
+            <h3>ReAct Agent Progress</h3>
+            <div class="react-status">
+                <div class="react-progress">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progress-fill"></div>
+                    </div>
+                    <div class="progress-text" id="progress-text">Initializing...</div>
+                </div>
+                <button id="stop-react-btn" class="stop-btn">Stop Agent</button>
+            </div>
+            <div class="react-images" id="react-images">
+            </div>
+        </div>
+        
         <div class="chat-section">
             <div class="chat-messages" id="chat-messages">
                 <div class="message assistant">
@@ -253,6 +371,13 @@ export UI_API_KEY=your_ui_api_key</pre>
         // API Configuration
         const API_BASE_URL = 'http://localhost:9000';
         let sessionId = '';
+        
+        // Extract final_reasoning from text
+        function extractFinalReasoning(text) {
+            const pattern = /<final_reasoning>([\s\S]*?)<\/final_reasoning>/;
+            const match = text.match(pattern);
+            return match ? match[1].trim() : null;
+        }
         
         // Initialization
         async function init() {
@@ -298,7 +423,9 @@ export UI_API_KEY=your_ui_api_key</pre>
 /single - Exit multi-turn conversation mode<br>
 /load docs - Load documents and build index<br>
 /unload docs - Close document index<br>
-/image - Get latest image`;
+/image - Get latest image<br>
+/react [task] [max_iterations] - Start ReAct agent mode<br>
+/stop-react - Stop running ReAct agent`;
                     addMessage(helpMessage, 'assistant');
                     
                     // Clear images
@@ -403,7 +530,9 @@ export UI_API_KEY=your_ui_api_key</pre>
 /single - Exit multi-turn conversation mode<br>
 /load docs - Load documents and build index<br>
 /unload docs - Close document index<br>
-/image - Get latest image`;
+/image - Get latest image<br>
+/react [task] [max_iterations] - Start ReAct agent mode<br>
+/stop-react - Stop running ReAct agent`;
                 
                 addMessage(helpMessage, 'assistant');
                 return;
@@ -611,6 +740,181 @@ UI-Model API Status: ${data.ui_model_status}`;
                 return;
             }
             
+            // ReAct agent command
+            if (query.toLowerCase().startsWith('/react')) {
+                addMessage(query, 'user');
+                queryInput.value = '';
+                
+                let task = '';
+                let maxIterations = 10;
+                
+                const commandPart = query.substring(6).trim();
+                
+                if (!commandPart) {
+                    addMessage('Usage: /react [task] [max_iterations]<br>Example: /react "Open Notepad and type Hello" 10<br>Or: /react Open Notepad 10', 'assistant');
+                    return;
+                }
+                
+                const lastSpaceIndex = commandPart.lastIndexOf(' ');
+                if (lastSpaceIndex > 0) {
+                    const lastPart = commandPart.substring(lastSpaceIndex + 1);
+                    const parsedIterations = parseInt(lastPart);
+                    
+                    if (!isNaN(parsedIterations) && parsedIterations > 0) {
+                        maxIterations = parsedIterations;
+                        task = commandPart.substring(0, lastSpaceIndex).trim();
+                    } else {
+                        task = commandPart;
+                    }
+                } else {
+                    task = commandPart;
+                }
+                
+                if (!task) {
+                    addMessage('Usage: /react [task] [max_iterations]<br>Example: /react "Open Notepad and type Hello" 10<br>Or: /react Open Notepad 10', 'assistant');
+                    return;
+                }
+                
+                addMessage(`Starting ReAct agent with task: "${task}" (max iterations: ${maxIterations})`, 'assistant');
+                
+                // Show ReAct section
+                document.getElementById('react-section').classList.add('active');
+                document.getElementById('progress-fill').style.width = '0%';
+                document.getElementById('progress-text').textContent = 'Starting ReAct agent...';
+                document.getElementById('react-images').innerHTML = '';
+                
+                // Disable input and button
+                queryInput.disabled = true;
+                document.getElementById('send-btn').disabled = true;
+                
+                try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 minutes timeout
+                    
+                    const response = await fetch(`${API_BASE_URL}/react`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            session_id: sessionId,
+                            task: task,
+                            max_iterations: maxIterations
+                        }),
+                        signal: controller.signal
+                    });
+                    
+                    clearTimeout(timeoutId);
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        // Extract final_reasoning if present
+                        const finalReasoning = extractFinalReasoning(data.message);
+                        
+                        if (finalReasoning) {
+                            // Display final reasoning in a styled box
+                            const reasoningHtml = `
+                                <div class="final-reasoning">
+                                    <strong>Final Reasoning:</strong>
+                                    <p>${finalReasoning}</p>
+                                </div>
+                            `;
+                            addMessage(`ReAct agent completed successfully in ${data.iterations_completed} iterations<br>${reasoningHtml}`, 'assistant');
+                        } else {
+                            addMessage(`ReAct agent completed successfully in ${data.iterations_completed} iterations`, 'assistant');
+                        }
+                        
+                        document.getElementById('progress-fill').style.width = '100%';
+                        document.getElementById('progress-text').textContent = `Completed: ${data.message}`;
+                        
+                        // Display iteration images
+                        if (data.images && data.images.length > 0) {
+                            const reactImages = document.getElementById('react-images');
+                            data.images.forEach((imgBase64, index) => {
+                                const imageItem = document.createElement('div');
+                                imageItem.className = 'react-image-item';
+                                imageItem.innerHTML = `
+                                    <img src="data:image/jpeg;base64,${imgBase64}" alt="Iteration ${index + 1}">
+                                    <span>Iteration ${index + 1}</span>
+                                `;
+                                reactImages.appendChild(imageItem);
+                            });
+                        }
+                    } else {
+                        // Extract final_reasoning even if failed
+                        const finalReasoning = extractFinalReasoning(data.message);
+                        
+                        if (finalReasoning) {
+                            const reasoningHtml = `
+                                <div class="final-reasoning">
+                                    <strong>Final Reasoning:</strong>
+                                    <p>${finalReasoning}</p>
+                                </div>
+                            `;
+                            addMessage(`ReAct agent: ${data.message}<br>${reasoningHtml}`, 'assistant');
+                        } else {
+                            addMessage(`ReAct agent: ${data.message}`, 'assistant');
+                        }
+                        
+                        document.getElementById('progress-text').textContent = `Failed: ${data.message}`;
+                        
+                        // Display iteration images even if failed
+                        if (data.images && data.images.length > 0) {
+                            const reactImages = document.getElementById('react-images');
+                            data.images.forEach((imgBase64, index) => {
+                                const imageItem = document.createElement('div');
+                                imageItem.className = 'react-image-item';
+                                imageItem.innerHTML = `
+                                    <img src="data:image/jpeg;base64,${imgBase64}" alt="Iteration ${index + 1}">
+                                    <span>Iteration ${index + 1}</span>
+                                `;
+                                reactImages.appendChild(imageItem);
+                            });
+                        }
+                    }
+                } catch (error) {
+                    console.error('Failed to run ReAct agent:', error);
+                    document.getElementById('error-message').textContent = 'Failed to run ReAct agent: ' + error.message;
+                    document.getElementById('progress-text').textContent = 'Error: ' + error.message;
+                } finally {
+                    // Re-enable input and button
+                    queryInput.disabled = false;
+                    document.getElementById('send-btn').disabled = false;
+                }
+                return;
+            }
+            
+            // Stop ReAct agent command
+            if (query.toLowerCase() === '/stop-react') {
+                addMessage(query, 'user');
+                queryInput.value = '';
+                
+                try {
+                    const response = await fetch(`${API_BASE_URL}/stop-react`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            session_id: sessionId
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        addMessage('ReAct agent stopped successfully', 'assistant');
+                        document.getElementById('progress-text').textContent = 'Stopped by user';
+                    } else {
+                        addMessage(data.message, 'assistant');
+                    }
+                } catch (error) {
+                    console.error('Failed to stop ReAct agent:', error);
+                    document.getElementById('error-message').textContent = 'Failed to stop ReAct agent: ' + error.message;
+                }
+                return;
+            }
+            
             // Add user message
             addMessage(query, 'user');
             
@@ -645,8 +949,25 @@ UI-Model API Status: ${data.ui_model_status}`;
                 if (data.success) {
                     // Remove loading message
                     loadingMessage.remove();
-                    // Add assistant message
-                    addMessage(data.response, 'assistant');
+                    
+                    // Extract final_reasoning if present
+                    const finalReasoning = extractFinalReasoning(data.response);
+                    
+                    if (finalReasoning) {
+                        // Display final reasoning in a styled box
+                        const reasoningHtml = `
+                            <div class="final-reasoning">
+                                <strong>Final Reasoning:</strong>
+                                <p>${finalReasoning}</p>
+                            </div>
+                        `;
+                        // Remove the final_reasoning tag from the response
+                        const cleanResponse = data.response.replace(/<final_reasoning>[\s\S]*?<\/final_reasoning>/, '').trim();
+                        addMessage(`${cleanResponse}<br>${reasoningHtml}`, 'assistant');
+                    } else {
+                        // Add assistant message
+                        addMessage(data.response, 'assistant');
+                    }
                     
                     // If there is an image, update processed image
                     if (data.image) {
@@ -686,6 +1007,31 @@ UI-Model API Status: ${data.ui_model_status}`;
         document.getElementById('send-btn').addEventListener('click', sendQuery);
         
         document.getElementById('init-btn').addEventListener('click', init);
+        
+        document.getElementById('stop-react-btn').addEventListener('click', async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/stop-react`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        session_id: sessionId
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    addMessage('ReAct agent stopped successfully', 'assistant');
+                    document.getElementById('progress-text').textContent = 'Stopped by user';
+                } else {
+                    addMessage(data.message, 'assistant');
+                }
+            } catch (error) {
+                console.error('Failed to stop ReAct agent:', error);
+                document.getElementById('error-message').textContent = 'Failed to stop ReAct agent: ' + error.message;
+            }
+        });
         
         document.getElementById('query-input').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
