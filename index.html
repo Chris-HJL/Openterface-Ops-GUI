@@ -812,6 +812,9 @@ UI-Model API Status: ${data.ui_model_status}`;
                         // Extract final_reasoning if present
                         const finalReasoning = extractFinalReasoning(data.message);
                         
+                        // Remove final_reasoning tag from message to avoid duplication
+                        const cleanMessage = data.message.replace(/<final_reasoning>[\s\S]*?<\/final_reasoning>/, '').trim();
+                        
                         if (finalReasoning) {
                             // Display final reasoning in a styled box
                             const reasoningHtml = `
@@ -820,13 +823,13 @@ UI-Model API Status: ${data.ui_model_status}`;
                                     <p>${finalReasoning}</p>
                                 </div>
                             `;
-                            addMessage(`ReAct agent completed successfully in ${data.iterations_completed} iterations<br>${reasoningHtml}`, 'assistant');
+                            addMessage(`ReAct agent completed successfully in ${data.iterations_completed} iterations<br>${cleanMessage}<br>${reasoningHtml}`, 'assistant');
                         } else {
-                            addMessage(`ReAct agent completed successfully in ${data.iterations_completed} iterations`, 'assistant');
+                            addMessage(`ReAct agent completed successfully in ${data.iterations_completed} iterations<br>${cleanMessage}`, 'assistant');
                         }
                         
                         document.getElementById('progress-fill').style.width = '100%';
-                        document.getElementById('progress-text').textContent = `Completed: ${data.message}`;
+                        document.getElementById('progress-text').textContent = `Completed: ${cleanMessage}`;
                         
                         // Display iteration images
                         if (data.images && data.images.length > 0) {
@@ -845,19 +848,23 @@ UI-Model API Status: ${data.ui_model_status}`;
                         // Extract final_reasoning even if failed
                         const finalReasoning = extractFinalReasoning(data.message);
                         
+                        // Remove final_reasoning tag from message to avoid duplication
+                        const cleanMessage = data.message.replace(/<final_reasoning>[\s\S]*?<\/final_reasoning>/, '').trim();
+                        
                         if (finalReasoning) {
+                            // Display final reasoning in a styled box
                             const reasoningHtml = `
                                 <div class="final-reasoning">
                                     <strong>Final Reasoning:</strong>
                                     <p>${finalReasoning}</p>
                                 </div>
                             `;
-                            addMessage(`ReAct agent: ${data.message}<br>${reasoningHtml}`, 'assistant');
+                            addMessage(`ReAct agent: ${cleanMessage}<br>${reasoningHtml}`, 'assistant');
                         } else {
-                            addMessage(`ReAct agent: ${data.message}`, 'assistant');
+                            addMessage(`ReAct agent: ${cleanMessage}`, 'assistant');
                         }
                         
-                        document.getElementById('progress-text').textContent = `Failed: ${data.message}`;
+                        document.getElementById('progress-text').textContent = `Failed: ${cleanMessage}`;
                         
                         // Display iteration images even if failed
                         if (data.images && data.images.length > 0) {

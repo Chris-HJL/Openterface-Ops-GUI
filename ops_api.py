@@ -606,8 +606,19 @@ async def react(request: ReactRequest):
             if task_status == "completed":
                 print(f"[ReAct Session {request.session_id}] Task completed at iteration {iteration_num}")
                 session.react_is_running = False
+                
+                # Extract final_reasoning from response
+                final_reasoning_pattern = r'<final_reasoning>(.*?)</final_reasoning>'
+                final_reasoning_matches = [m.strip() for m in __import__('re').findall(final_reasoning_pattern, response, __import__('re').DOTALL)]
+                final_reasoning = final_reasoning_matches[0] if final_reasoning_matches else None
+                
+                # Build message with final_reasoning
+                message = f"Task completed successfully in {iteration_num} iterations"
+                if final_reasoning:
+                    message += f"\n<final_reasoning>{final_reasoning}</final_reasoning>"
+                
                 return ReactResponse(
-                    message=f"Task completed successfully in {iteration_num} iterations",
+                    message=message,
                     iterations_completed=iteration_num,
                     final_status="completed",
                     success=True,

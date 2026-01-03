@@ -337,6 +337,7 @@ def get_api_response(prompt: str, api_url: str = "http://localhost:11434/v1/chat
                             - Enclose the action to perform with <action></action>, e.g. <action>Click</action>, <action>Keyboard [Left]</action>.
                             - Enclose the element name with <element></element> where the action should be performed, e.g. <element>OK Button</element>.
                             - Enclose the text to input with <input></input> if the action is Input, e.g. <input>Hello World</input>.
+                            - Enclose the brief description of the action with <final_reasoning></final_reasoning>, e.g. <final_reasoning>Click the OK Button to confirm</final_reasoning>.
                         # Available Actions:
                             - Click
                             - Double Click
