@@ -326,7 +326,26 @@ def get_api_response(prompt: str, api_url: str = "http://localhost:11434/v1/chat
                 })
                 messages.append({
                     "role": "system",
-                    "content": "Use the same language as user types. Enclose the name of the element (not the coordinate) with <click></click>, which is the element to click in the next step."
+                    # "content": "Use the same language as user types. Enclose the name of the element (not the coordinate) with <click></click>, which is the element to click in the next step."
+                    "content": """
+                        # Language:
+                            Use the same language as user types.
+                        # Task:
+                            Suggest the next action to perform based on the user instruction/query and the UI elements shown in the image.
+                        # Output Format:
+                            - Enclose your response with <Answer>Your response</Answer>.
+                            - Enclose the action to perform with <action></action>, e.g. <action>Click</action>, <action>Keyboard [Left]</action>.
+                            - Enclose the element name with <element></element> where the action should be performed, e.g. <element>OK Button</element>.
+                            - Enclose the text to input with <input></input> if the action is Input, e.g. <input>Hello World</input>.
+                        # Available Actions:
+                            - Click
+                            - Double Click
+                            - Input
+                            - Keyboard [the key to press], e.g. <action>Keyboard [Left]</action>, <action>Keyboard [Enter]</action>.
+                        # Scenario:
+                            - If it is in BIOS, only use Keyboard action, unless there is a mouse cursor shown in the image.
+                            - To open an app with desktop icon, use <action>Double Click</action> on the icon.
+                    """
                 })
             else:
                 messages.append({

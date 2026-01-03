@@ -160,6 +160,30 @@ def image_to_base64(filepath: str) -> str:
     with open(filepath, "rb") as f:
         return base64.b64encode(f.read()).decode("utf-8")
 
+def extract_action_and_element(text: str) -> tuple:
+    """
+    Extract action and element from response
+    
+    Args:
+        text: Response text containing <action> and <element> tags
+        
+    Returns:
+        Tuple of (action, element) where each can be None if not found
+    """
+    import re
+    
+    # Extract action
+    action_pattern = r'<action>(.*?)</action>'
+    action_matches = re.findall(action_pattern, text, re.DOTALL)
+    action = action_matches[0].strip() if action_matches else None
+    
+    # Extract element
+    element_pattern = r'<element>(.*?)</element>'
+    element_matches = re.findall(element_pattern, text, re.DOTALL)
+    element = element_matches[0].strip() if element_matches else None
+    
+    return (action, element)
+
 # API endpoints
 @app.post("/create-session", response_model=SessionResponse)
 async def create_session(request: CreateSessionRequest):
@@ -236,6 +260,7 @@ async def chat(request: ChatRequest):
             request.prompt, session.api_url, model, image_path,
             retrieved_docs=retrieved_docs
         )
+    print(f"[Session {request.session_id}] API response: {response}")
     
     # Update conversation history if in multiturn mode
     updated_history = session.conversation_history.copy()
@@ -254,13 +279,13 @@ async def chat(request: ChatRequest):
     
     # Check for UI-Model request
     processed_image = None
-    click_content = extract_click_content(response)
-    if click_content and image_path:
+    action, element = extract_action_and_element(response)
+    if action in ["Click", "Double Click"] and element and image_path:
         # Process UI-Model
         try:
-            # Call UI-Model API
+            # Call UI-Model API with element content
             ui_model_response = call_ui_ins_api(
-                image_path, click_content, session.ui_model_api_url, session.ui_model
+                image_path, element, session.ui_model_api_url, session.ui_model
             )
             
             # Parse coordinates
