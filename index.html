@@ -292,7 +292,7 @@
                 </div>
                 <div class="config-item">
                     <label for="model">LLM Model:</label>
-                    <input type="text" id="model" placeholder="Enter LLM Model Name" value="qwen3-vl:32b">
+                    <input type="text" id="model" placeholder="Enter LLM Model Name" value="qwen3-vl:8b-thinking-q4_K_M">
                 </div>
                 <div class="config-item">
                     <label for="ui-model-api-url">UI-Model API URL:</label>
@@ -746,12 +746,12 @@ UI-Model API Status: ${data.ui_model_status}`;
                 queryInput.value = '';
                 
                 let task = '';
-                let maxIterations = 10;
+                let maxIterations = 20;
                 
                 const commandPart = query.substring(6).trim();
                 
                 if (!commandPart) {
-                    addMessage('Usage: /react [task] [max_iterations]<br>Example: /react "Open Notepad and type Hello" 10<br>Or: /react Open Notepad 10', 'assistant');
+                    addMessage('Usage: /react [task] [max_iterations]<br>Example: /react "Open Notepad and type Hello" 20<br>Or: /react Open Notepad 20', 'assistant');
                     return;
                 }
                 
@@ -771,7 +771,7 @@ UI-Model API Status: ${data.ui_model_status}`;
                 }
                 
                 if (!task) {
-                    addMessage('Usage: /react [task] [max_iterations]<br>Example: /react "Open Notepad and type Hello" 10<br>Or: /react Open Notepad 10', 'assistant');
+                    addMessage('Usage: /react [task] [max_iterations]<br>Example: /react "Open Notepad and type Hello" 20<br>Or: /react Open Notepad 20', 'assistant');
                     return;
                 }
                 

@@ -53,14 +53,14 @@ class Session:
         self.rag_enabled = False
         # API configurations
         self.api_url = "http://localhost:11434/v1/chat/completions"
-        self.model = "qwen3-vl:32b"
+        self.model = "qwen3-vl:8b-thinking-q4_K_M"
         self.ui_model_api_url = "http://localhost:2345/v1/chat/completions"
         self.ui_model = "fara-7b"
         # Current image path for the session
         self.current_image_path = None
         # ReAct agent configurations
         self.react_enabled = False
-        self.react_max_iterations = 10
+        self.react_max_iterations = 20
         self.react_current_iteration = 0
         self.react_task_description = None
         self.react_is_running = False
@@ -106,7 +106,7 @@ class GetImageRequest(BaseModel):
 class ReactRequest(BaseModel):
     session_id: str
     task: str
-    max_iterations: Optional[int] = 10
+    max_iterations: Optional[int] = 20
     rag_enabled: Optional[bool] = None
     model: Optional[str] = None
 
@@ -321,6 +321,8 @@ async def chat(request: ChatRequest):
             ui_model_response = call_ui_ins_api(
                 image_path, element, session.ui_model_api_url, session.ui_model
             )
+
+            print(f"[Session {request.session_id}] UI-Model response: {ui_model_response}")
             
             # Parse coordinates
             point_x, point_y = parse_coordinates(ui_model_response)
@@ -659,6 +661,8 @@ async def react(request: ReactRequest):
                     ui_model_response = call_ui_ins_api(
                         image_path, element, session.ui_model_api_url, session.ui_model
                     )
+                    print(f"[Session {request.session_id}] UI-Model response: {ui_model_response}")
+
                     
                     # Parse coordinates
                     point_x, point_y = parse_coordinates(ui_model_response)
