@@ -68,13 +68,13 @@ def load_ui_model(model_path: str = UI_MODEL_PATH):
     print("UI-Model loaded successfully")
 
 
-def run_ui_model_inference(image_path: str, instruction: str) -> tuple[int, int]:
+def run_ui_model_inference(messages: list, max_tokens: int = 128) -> tuple[int, int]:
     """
     Run UI-Model inference to get coordinates
     
     Args:
-        image_path: Path to the image
-        instruction: Instruction text
+        messages: Messages list containing image and instruction
+        max_tokens: Maximum number of tokens to generate
         
     Returns:
         Coordinate point (x, y)
@@ -85,22 +85,27 @@ def run_ui_model_inference(image_path: str, instruction: str) -> tuple[int, int]
     if ui_model is None or ui_processor is None:
         load_ui_model()
     
-    # Load image
-    image = Image.open(image_path).convert("RGB")
+    # Extract image from messages
+    image = None
+    for message in messages:
+        if message['role'] == 'user':
+            content = message.get('content', '')
+            if isinstance(content, list):
+                for item in content:
+                    if item['type'] == 'image_url':
+                        image_url = item['image_url']['url']
+                        if image_url.startswith('data:image/'):
+                            import base64
+                            import io
+                            base64_data = image_url.split(',')[1]
+                            image_bytes = base64.b64decode(base64_data)
+                            image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+                            break
+            if image is not None:
+                break
     
-    # Build messages
-    messages = [
-        # {
-        #     "role":"system",
-        #     "content": "Provide the coordinate of the element in the screenshot. The coordinate should be in the format of [x, y], enclosed in square brackets."
-        # },
-        {
-        "role": "user",
-        "content": [
-            {"type": "image"},
-            {"type": "text", "text": instruction}
-        ]
-        }]
+    if image is None:
+        return -1, -1
     
     # Process input
     prompt = ui_processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
@@ -109,7 +114,7 @@ def run_ui_model_inference(image_path: str, instruction: str) -> tuple[int, int]
     # Generate response
     generated_ids = ui_model.generate(
         **inputs,
-        # max_new_tokens=128,
+        max_new_tokens=max_tokens,
         # temperature=0.0,
         # top_p=1.0,
         # top_k=-1,
@@ -158,14 +163,28 @@ def unload_ui_model():
     print("UI-Model has been unloaded")
 
 
-def process_ui_element_request(image_path: str, instruction: str) -> Dict[str, Any]:
+def process_ui_element_request(messages: list, max_tokens: int = 128) -> Dict[str, Any]:
     """
     Process UI element localization request
     """
+    # Extract instruction from messages for logging
+    instruction = ""
+    for message in messages:
+        if message['role'] == 'user':
+            content = message.get('content', '')
+            if isinstance(content, list):
+                for item in content:
+                    if item['type'] == 'text':
+                        instruction = item['text']
+                        break
+            else:
+                instruction = content
+            break
+    
     print(f"\nLocating element: {instruction}")
     
     # Run UI-Model inference (will automatically load model if not loaded)
-    point_x, point_y = run_ui_model_inference(image_path, instruction)
+    point_x, point_y = run_ui_model_inference(messages, max_tokens)
     
     if point_x != -1:
         print(f"Element located successfully at coordinates: ({point_x}, {point_y})")
@@ -192,76 +211,21 @@ def chat_completions():
         data = request.json
         messages = data.get('messages', [])
         
-        # Extract last user message
-        user_message = None
-        for msg in reversed(messages):
-            if msg['role'] == 'user':
-                user_message = msg
-                break
-        
-        if not user_message:
+        if not messages:
             return jsonify({
                 "error": {
-                    "message": "No user message found",
+                    "message": "No messages found",
                     "type": "invalid_request_error",
                     "param": None,
                     "code": None
                 }
             }), 400
         
-        # Extract instruction and image
-        instruction = None
-        image_data = None
+        # Extract max_tokens parameter
+        max_tokens = data.get('max_tokens', 128)
         
-        content = user_message.get('content', '')
-        if isinstance(content, list):
-            # Process multimodal content
-            for item in content:
-                if item['type'] == 'text':
-                    instruction = item['text']
-                elif item['type'] == 'image_url':
-                    image_url = item['image_url']['url']
-                    # Process base64 image data
-                    if image_url.startswith('data:image/'):
-                        import base64
-                        import io
-                        # Extract base64 data
-                        base64_data = image_url.split(',')[1]
-                        # Decode base64 data to bytes
-                        image_bytes = base64.b64decode(base64_data)
-                        # Create temporary image file
-                        timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-                        temp_image_path = f"./temp_images/ui_model_temp_{timestamp}.jpg"
-                        os.makedirs("./temp_images", exist_ok=True)
-                        with open(temp_image_path, 'wb') as f:
-                            f.write(image_bytes)
-                        image_data = temp_image_path
-        else:
-            # Plain text content
-            instruction = content
-        
-        if not instruction:
-            return jsonify({
-                "error": {
-                    "message": "No instruction found",
-                    "type": "invalid_request_error",
-                    "param": None,
-                    "code": None
-                }
-            }), 400
-        
-        if not image_data:
-            return jsonify({
-                "error": {
-                    "message": "No image found",
-                    "type": "invalid_request_error",
-                    "param": None,
-                    "code": None
-                }
-            }), 400
-        
-        # Process UI element localization request
-        result = process_ui_element_request(image_data, instruction)
+        # Process UI element localization request with messages
+        result = process_ui_element_request(messages, max_tokens)
         
         # Decide whether to unload model based on standby mode
         if standby_mode == "cold":
