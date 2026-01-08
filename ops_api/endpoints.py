@@ -12,6 +12,8 @@ from PIL import Image
 
 from .models import *
 from .session import Session
+from .react_memory import IterationRecord
+from .react_context import ReActContextBuilder
 from ops_core import (
     Translator,
     ImageEncoder,
@@ -415,6 +417,10 @@ async def react(request: ReactRequest):
     session.react_task_description = request.task
     session.react_is_running = True
 
+    # 初始化记忆
+    session.initialize_react_memory(request.task)
+    context_builder = ReActContextBuilder(session.react_memory, max_context_iterations=5)
+
     # 使用会话或请求的模型和RAG设置
     model = request.model or session.model
     rag_enabled = request.rag_enabled if request.rag_enabled is not None else session.rag_enabled
@@ -437,6 +443,20 @@ async def react(request: ReactRequest):
             image_path = image_server_client.get_last_image()
             if image_path and not image_path.startswith("./images"):
                 logger.error(f"[ReAct] Failed to get image from server: {image_path}")
+                
+                # 记录失败的迭代
+                iteration_record = IterationRecord(
+                    iteration_number=iteration_num,
+                    timestamp=datetime.now().isoformat(),
+                    image_path=image_path,
+                    prompt="",
+                    llm_response="",
+                    execution_success=False,
+                    execution_error=f"Failed to get image from server: {image_path}",
+                    task_status="error"
+                )
+                session.react_memory_store.add_iteration(session.session_id, iteration_record)
+                
                 return ReactResponse(
                     message=f"Failed to get image from server: {image_path}",
                     iterations_completed=iteration_num - 1,
@@ -446,40 +466,65 @@ async def react(request: ReactRequest):
                 )
             logger.info(f"[ReAct] Got image: {image_path}")
 
-            # 构建任务完成检查的提示
-            check_prompt = f"""
-                Task: {session.react_task_description}
+            # 构建基础提示
+            base_prompt = f"""
+Please analyze the current screen and determine if the task has been completed.
+Respond with one of the following:
+- <task_status>completed</task_status> if the task is done
+- <task_status>in_progress</task_status> if the task is not yet completed or the screen may still be loading
 
-                Current iteration: {iteration_num}/{session.react_max_iterations}
+If the screen may still be loading, no other information is needed.
+Else if not completed, also provide:
+- <action>Click</action> or <action>Double Click</action> or <action>none</action>
+- <element>description of UI element to interact with</element> (if action is Click or Double Click)
+- <reasoning>brief explanation of what needs to be done next</reasoning>
+Else if completed, also provide:
+- <final_reasoning>brief explanation of the task completion</final_reasoning>
+"""
 
-                Please analyze the current screen and determine if the task has been completed.
-                Respond with one of the following:
-                - <task_status>completed</task_status> if the task is done
-                - <task_status>in_progress</task_status> if the task is not yet completed or the screen may still be loading
-
-                If the screen may still be loading, no other information is needed.
-                Else if not completed, also provide:
-                - <action>Click</action> or <action>Double Click</action> or <action>none</action>
-                - <element>description of UI element to interact with</element> (if action is Click or Double Click)
-                - <reasoning>brief explanation of what needs to be done next</reasoning>
-                Else if completed, also provide:
-                - <final_reasoning>brief explanation of the task completion</final_reasoning>
-            """
+            # 使用记忆构建增强提示
+            enhanced_prompt = context_builder.build_enhanced_prompt(base_prompt, iteration_num)
 
             # 获取API响应
             logger.info(f"[ReAct] Calling LLM API to check task completion...")
             api_client = LLMAPIClient(session.api_url, model)
             response = api_client.get_response(
-                check_prompt,
+                enhanced_prompt,
                 image_path=image_path,
-                retrieved_docs=session.retriever.retrieve(check_prompt) if rag_enabled and session.retriever else None
+                retrieved_docs=session.retriever.retrieve(enhanced_prompt) if rag_enabled and session.retriever else None
             )
             logger.info(f"[ReAct] LLM Response: {response[:200]}...")
+
+            # 解析响应
+            parser = ResponseParser()
+            action, element, input_content, key_content = parser.extract_action_and_element(response)
+            logger.info(f"[ReAct] Parsed action: {action}, element: {element}, input: {input_content}, key: {key_content}")
+
+            # 提取 reasoning
+            reasoning_pattern = r'<reasoning>(.*?)</reasoning>'
+            reasoning_matches = [m.strip() for m in __import__('re').findall(reasoning_pattern, response, __import__('re').DOTALL)]
+            reasoning = reasoning_matches[0] if reasoning_matches else None
 
             # Check if task is completed
             task_status_pattern = r'<task_status>(.*?)</task_status>'
             task_status_matches = [m.strip() for m in __import__('re').findall(task_status_pattern, response, __import__('re').DOTALL)]
             task_status = task_status_matches[0] if task_status_matches else "in_progress"
+            
+            # 记录迭代
+            iteration_record = IterationRecord(
+                iteration_number=iteration_num,
+                timestamp=datetime.now().isoformat(),
+                image_path=image_path,
+                prompt=enhanced_prompt,
+                llm_response=response,
+                parsed_action=action,
+                parsed_element=element,
+                parsed_input=input_content,
+                parsed_key=key_content,
+                reasoning=reasoning,
+                execution_success=False,
+                task_status=task_status
+            )
             
             if task_status == "completed":
                 print(f"[ReAct Session {request.session_id}] Task completed at iteration {iteration_num}")
@@ -489,6 +534,11 @@ async def react(request: ReactRequest):
                 final_reasoning_pattern = r'<final_reasoning>(.*?)</final_reasoning>'
                 final_reasoning_matches = [m.strip() for m in __import__('re').findall(final_reasoning_pattern, response, __import__('re').DOTALL)]
                 final_reasoning = final_reasoning_matches[0] if final_reasoning_matches else None
+                
+                # 更新迭代记录
+                iteration_record.execution_success = True
+                session.react_memory_store.add_iteration(session.session_id, iteration_record)
+                session.react_memory_store.finalize_memory(session.session_id, "completed", final_reasoning)
                 
                 # Build message with final_reasoning
                 message = f"Task completed successfully in {iteration_num} iterations"
@@ -505,9 +555,9 @@ async def react(request: ReactRequest):
 
             # 处理UI操作
             logger.info(f"[ReAct] Processing UI action...")
-            parser = ResponseParser()
-            action, element, input_content, key_content = parser.extract_action_and_element(response)
-            logger.info(f"[ReAct] Parsed action: {action}, element: {element}, input: {input_content}, key: {key_content}")
+            execution_success = False
+            execution_result = None
+            execution_error = None
 
             if action in ["Click", "Double Click", "Right Click"] and element and image_path:
                 logger.info(f"[ReAct] Executing {action} on {element}")
@@ -517,21 +567,35 @@ async def react(request: ReactRequest):
                 )
                 if success:
                     logger.info(f"[ReAct] UI action successful: {result}")
+                    execution_success = True
+                    execution_result = str(result)
                     if isinstance(result, str) and os.path.exists(result):
                         iteration_images.append(image_to_base64(result))
                         logger.info(f"[ReAct] Added processed image to iteration images")
                 else:
                     logger.error(f"[ReAct] UI action failed: {result}")
+                    execution_error = str(result)
             elif action == "Input" and input_content:
                 logger.info(f"[ReAct] Sending input: {input_content}")
                 script_command = f'Send "{input_content}"'
                 image_server_client.send_script_command(script_command)
                 logger.info(f"[ReAct] Input sent successfully")
+                execution_success = True
+                execution_result = "Input sent successfully"
             elif action == "Keyboard" and key_content:
                 logger.info(f"[ReAct] Sending keyboard key: {key_content}")
                 script_command = f'Send "{{{key_content}}}"'
                 image_server_client.send_script_command(script_command)
                 logger.info(f"[ReAct] Keyboard command sent successfully")
+                execution_success = True
+                execution_result = "Keyboard command sent successfully"
+
+            # 更新迭代记录
+            iteration_record.execution_success = execution_success
+            iteration_record.execution_result = execution_result
+            iteration_record.execution_error = execution_error
+            session.react_memory_store.add_iteration(session.session_id, iteration_record)
+            session.react_memory_store.update_patterns(session.session_id, iteration_record)
 
             # 等待一段时间让系统响应
             import time
@@ -541,6 +605,7 @@ async def react(request: ReactRequest):
         # 达到最大迭代次数
         logger.warning(f"[ReAct] Maximum iterations reached: {session.react_max_iterations}")
         session.react_is_running = False
+        session.react_memory_store.finalize_memory(session.session_id, "max_iterations")
         return ReactResponse(
             message="Maximum iterations reached",
             iterations_completed=session.react_max_iterations,
@@ -552,6 +617,7 @@ async def react(request: ReactRequest):
     except Exception as e:
         logger.error(f"[ReAct] Error during execution: {str(e)}", exc_info=True)
         session.react_is_running = False
+        session.react_memory_store.finalize_memory(session.session_id, "error", str(e))
         return ReactResponse(
             message=f"Error during ReAct execution: {str(e)}",
             iterations_completed=session.react_current_iteration,
@@ -571,6 +637,8 @@ async def stop_react(request: StopReactRequest):
     # 停止ReAct
     if session.react_is_running:
         session.react_is_running = False
+        if session.react_memory:
+            session.react_memory_store.finalize_memory(session.session_id, "stopped")
         return ReactResponse(
             message="ReAct agent stopped",
             iterations_completed=session.react_current_iteration,

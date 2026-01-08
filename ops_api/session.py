@@ -4,6 +4,7 @@
 from typing import Dict, Any, Optional, List
 from ops_core import Translator, DocumentRetriever
 from config import Config
+from .react_memory import ReActMemory, ReActMemoryStore
 
 class Session:
     """Session类用于管理每个客户端的状态"""
@@ -29,6 +30,10 @@ class Session:
         self.react_current_iteration = 0
         self.react_task_description: Optional[str] = None
         self.react_is_running = False
+        
+        # ReAct 记忆系统
+        self.react_memory: Optional[ReActMemory] = None
+        self.react_memory_store = ReActMemoryStore()
 
     def switch_language(self, lang_code: str) -> bool:
         """切换语言"""
@@ -44,3 +49,18 @@ class Session:
     def add_to_history(self, role: str, content: Any):
         """添加到对话历史"""
         self.conversation_history.append({"role": role, "content": content})
+    
+    def initialize_react_memory(self, task: str):
+        """初始化 ReAct 记忆"""
+        self.react_memory = self.react_memory_store.create_memory(
+            self.session_id,
+            task
+        )
+    
+    def get_react_memory(self) -> Optional[ReActMemory]:
+        """获取 ReAct 记忆"""
+        return self.react_memory
+    
+    def clear_react_memory(self):
+        """清除 ReAct 记忆"""
+        self.react_memory = None
