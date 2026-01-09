@@ -49,6 +49,7 @@ class ReActTask:
         # 最后一次执行信息
         self.last_action = None
         self.last_element = None
+        self.last_key_content = None
         self.last_reasoning = None
         self.last_task_status = None
         self.last_image = None
@@ -171,6 +172,7 @@ class ReActTask:
             "timestamp": datetime.now().isoformat(),
             "action": self.last_action,
             "element": self.last_element,
+            "key_content": self.last_key_content,
             "decision": "approved",
             "iteration": self.current_iteration
         })
@@ -191,6 +193,7 @@ class ReActTask:
             "timestamp": datetime.now().isoformat(),
             "action": self.last_action,
             "element": self.last_element,
+            "key_content": self.last_key_content,
             "decision": "rejected",
             "reason": reason,
             "iteration": self.current_iteration
@@ -284,7 +287,7 @@ class ReActTaskManager:
         """获取任务"""
         return self.tasks.get(task_id)
 
-    def _is_dangerous_action(self, action: str, element: str, dangerous_keywords: List[str]) -> bool:
+    def _is_dangerous_action(self, action: str, element: str, key_content: str, dangerous_keywords: List[str]) -> bool:
         """判断是否为危险操作"""
         dangerous_action_types = [
             "delete", "format", "uninstall", "destroy",
@@ -296,6 +299,11 @@ class ReActTaskManager:
         if element:
             element_lower = element.lower()
             if any(keyword.lower() in element_lower for keyword in dangerous_keywords):
+                return True
+        
+        if key_content:
+            key_content_lower = key_content.lower()
+            if any(keyword.lower() in key_content_lower for keyword in dangerous_keywords):
                 return True
 
         return False
@@ -446,6 +454,7 @@ Else if completed, also provide:
                 # 保存最后一次执行信息
                 task.last_action = action
                 task.last_element = element
+                task.last_key_content = key_content
                 task.last_reasoning = reasoning
                 task.last_task_status = task_status
                 task.last_image = image_path
@@ -458,7 +467,7 @@ Else if completed, also provide:
                     needs_approval = True
                     is_dangerous = True
                 elif task.approval_policy == "manual":
-                    is_dangerous = self._is_dangerous_action(action, element, task.dangerous_actions)
+                    is_dangerous = self._is_dangerous_action(action, element, key_content, task.dangerous_actions)
                     needs_approval = is_dangerous
 
                 if needs_approval and action and action != "none":
