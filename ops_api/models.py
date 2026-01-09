@@ -49,11 +49,49 @@ class ReactRequest(BaseModel):
 class StopReactRequest(BaseModel):
     session_id: str
 
+class CreateReactTaskRequest(BaseModel):
+    session_id: str
+    task: str
+    max_iterations: Optional[int] = 20
+    rag_enabled: Optional[bool] = None
+    model: Optional[str] = None
+
+class StopReactTaskRequest(BaseModel):
+    task_id: str
+
 # Response models
 class SessionResponse(BaseModel):
     session_id: str
     message: str
     success: bool
+
+class CreateReactTaskResponse(BaseModel):
+    task_id: str
+    message: str
+    success: bool
+
+class ReactTaskStatusResponse(BaseModel):
+    task_id: str
+    status: str
+    current_iteration: int
+    max_iterations: int
+    last_action: Optional[str] = None
+    last_element: Optional[str] = None
+    last_reasoning: Optional[str] = None
+    last_task_status: Optional[str] = None
+    last_status: Optional[str] = None
+    created_at: str
+    updated_at: str
+
+class ReactProgressData(BaseModel):
+    iteration: int
+    max_iterations: int
+    status: Optional[str] = None
+    action: Optional[str] = None
+    element: Optional[str] = None
+    reasoning: Optional[str] = None
+    task_status: Optional[str] = None
+    image_path: Optional[str] = None
 
 class GetImageResponse(BaseModel):
     image: str  # Base64 encoded image

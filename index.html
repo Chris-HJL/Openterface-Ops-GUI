@@ -276,6 +276,22 @@
             white-space: pre-wrap;
             word-wrap: break-word;
         }
+        
+        .react-progress {
+            background-color: #e7f3ff;
+            border-left: 4px solid #2196F3;
+            padding: 12px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        
+        .react-progress strong {
+            color: #1976D2;
+            display: block;
+            margin-bottom: 5px;
+        }
     </style>
 </head>
 <body>
@@ -371,6 +387,18 @@ export UI_API_KEY=your_ui_api_key</pre>
         // API Configuration
         const API_BASE_URL = 'http://localhost:9000';
         let sessionId = '';
+        let currentTaskId = null;
+        let currentEventSource = null;
+        let isStopping = false;
+        
+        // Debug function to log EventSource state
+        function logEventSourceState(context) {
+            console.log(`[${context}] EventSource state:`, {
+                exists: currentEventSource !== null,
+                readyState: currentEventSource ? currentEventSource.readyState : 'N/A',
+                url: currentEventSource ? currentEventSource.url : 'N/A'
+            });
+        }
         
         // Extract final_reasoning from text
         function extractFinalReasoning(text) {
@@ -788,10 +816,8 @@ UI-Model API Status: ${data.ui_model_status}`;
                 document.getElementById('send-btn').disabled = true;
                 
                 try {
-                    const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 minutes timeout
-                    
-                    const response = await fetch(`${API_BASE_URL}/react`, {
+                    // Create task
+                    const createResponse = await fetch(`${API_BASE_URL}/react-task`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
@@ -800,91 +826,219 @@ UI-Model API Status: ${data.ui_model_status}`;
                             session_id: sessionId,
                             task: task,
                             max_iterations: maxIterations
-                        }),
-                        signal: controller.signal
+                        })
                     });
                     
-                    clearTimeout(timeoutId);
+                    const createData = await createResponse.json();
                     
-                    const data = await response.json();
-                    
-                    if (data.success) {
-                        // Extract final_reasoning if present
-                        const finalReasoning = extractFinalReasoning(data.message);
-                        
-                        // Remove final_reasoning tag from message to avoid duplication
-                        const cleanMessage = data.message.replace(/<final_reasoning>[\s\S]*?<\/final_reasoning>/, '').trim();
-                        
-                        if (finalReasoning) {
-                            // Display final reasoning in a styled box
-                            const reasoningHtml = `
-                                <div class="final-reasoning">
-                                    <strong>Final Reasoning:</strong>
-                                    <p>${finalReasoning}</p>
-                                </div>
-                            `;
-                            addMessage(`ReAct agent completed successfully in ${data.iterations_completed} iterations<br>${cleanMessage}<br>${reasoningHtml}`, 'assistant');
-                        } else {
-                            addMessage(`ReAct agent completed successfully in ${data.iterations_completed} iterations<br>${cleanMessage}`, 'assistant');
-                        }
-                        
-                        document.getElementById('progress-fill').style.width = '100%';
-                        document.getElementById('progress-text').textContent = `Completed: ${cleanMessage}`;
-                        
-                        // Display iteration images
-                        if (data.images && data.images.length > 0) {
-                            const reactImages = document.getElementById('react-images');
-                            data.images.forEach((imgBase64, index) => {
-                                const imageItem = document.createElement('div');
-                                imageItem.className = 'react-image-item';
-                                imageItem.innerHTML = `
-                                    <img src="data:image/jpeg;base64,${imgBase64}" alt="Iteration ${index + 1}">
-                                    <span>Iteration ${index + 1}</span>
-                                `;
-                                reactImages.appendChild(imageItem);
-                            });
-                        }
-                    } else {
-                        // Extract final_reasoning even if failed
-                        const finalReasoning = extractFinalReasoning(data.message);
-                        
-                        // Remove final_reasoning tag from message to avoid duplication
-                        const cleanMessage = data.message.replace(/<final_reasoning>[\s\S]*?<\/final_reasoning>/, '').trim();
-                        
-                        if (finalReasoning) {
-                            // Display final reasoning in a styled box
-                            const reasoningHtml = `
-                                <div class="final-reasoning">
-                                    <strong>Final Reasoning:</strong>
-                                    <p>${finalReasoning}</p>
-                                </div>
-                            `;
-                            addMessage(`ReAct agent: ${cleanMessage}<br>${reasoningHtml}`, 'assistant');
-                        } else {
-                            addMessage(`ReAct agent: ${cleanMessage}`, 'assistant');
-                        }
-                        
-                        document.getElementById('progress-text').textContent = `Failed: ${cleanMessage}`;
-                        
-                        // Display iteration images even if failed
-                        if (data.images && data.images.length > 0) {
-                            const reactImages = document.getElementById('react-images');
-                            data.images.forEach((imgBase64, index) => {
-                                const imageItem = document.createElement('div');
-                                imageItem.className = 'react-image-item';
-                                imageItem.innerHTML = `
-                                    <img src="data:image/jpeg;base64,${imgBase64}" alt="Iteration ${index + 1}">
-                                    <span>Iteration ${index + 1}</span>
-                                `;
-                                reactImages.appendChild(imageItem);
-                            });
-                        }
+                    if (!createData.success) {
+                        throw new Error('Failed to create task');
                     }
+                    
+                    currentTaskId = createData.task_id;
+                    console.log('Task created:', currentTaskId);
+                    
+                    // Close existing event source if any
+                    if (currentEventSource) {
+                        console.log('Closing existing EventSource before creating new one');
+                        currentEventSource.close();
+                        currentEventSource = null;
+                    }
+                    
+                    // Connect to SSE stream
+                    currentEventSource = new EventSource(`${API_BASE_URL}/react-stream/${currentTaskId}`);
+                    console.log('EventSource created, readyState:', currentEventSource.readyState);
+                    
+                    currentEventSource.onmessage = function(event) {
+                        try {
+                            console.log('SSE event received:', event.data);
+                            const data = JSON.parse(event.data);
+                            console.log('Parsed SSE data:', data);
+                            console.log('Event type:', data.event);
+                            console.log('Event type type:', typeof data.event);
+                            console.log('Event type value:', JSON.stringify(data.event));
+                            
+                            if (data.event === 'progress') {
+                                console.log('Entering progress branch');
+                                const progressData = data.data;
+                                
+                                // Update progress bar
+                                const progressPercent = (progressData.iteration / progressData.max_iterations) * 100;
+                                document.getElementById('progress-fill').style.width = `${progressPercent}%`;
+                                
+                                // Update progress text - only show action and reasoning
+                                let statusText = `Iteration ${progressData.iteration}/${progressData.max_iterations}`;
+                                if (progressData.action && progressData.element) {
+                                    statusText += `\nAction: ${progressData.action} on ${progressData.element}`;
+                                }
+                                if (progressData.reasoning) {
+                                    statusText += `\nReasoning: ${progressData.reasoning}`;
+                                }
+                                document.getElementById('progress-text').textContent = statusText;
+                                
+                                // Add progress message to chat - only show action and reasoning
+                                const progressMessage = `
+                                    <div class="react-progress">
+                                        <strong>Iteration ${progressData.iteration}/${progressData.max_iterations}</strong><br>
+                                        ${progressData.action ? `Action: ${progressData.action}` : ''}<br>
+                                        ${progressData.element ? `Element: ${progressData.element}` : ''}<br>
+                                        ${progressData.reasoning ? `Reasoning: ${progressData.reasoning}` : ''}
+                                    </div>
+                                `;
+                                addMessage(progressMessage, 'assistant');
+                                
+                            } else if (data.event === 'completed') {
+                                console.log('Entering completed branch');
+                                const completedData = data.data;
+                                
+                                // Extract final_reasoning if present
+                                const finalReasoning = extractFinalReasoning(completedData.message);
+                                
+                                // Remove final_reasoning tag from message to avoid duplication
+                                const cleanMessage = completedData.message.replace(/<final_reasoning>[\s\S]*?<\/final_reasoning>/, '').trim();
+                                
+                                let completionMessage = '';
+                                let progressText = '';
+                                
+                                if (completedData.final_status === 'max_iterations') {
+                                    completionMessage = `ReAct agent reached maximum iterations (${completedData.iterations_completed}/${completedData.iterations_completed})<br>${cleanMessage}`;
+                                    progressText = `Max iterations reached`;
+                                } else if (completedData.final_status === 'completed') {
+                                    if (finalReasoning) {
+                                        // Display final reasoning in a styled box
+                                        const reasoningHtml = `
+                                            <div class="final-reasoning">
+                                                <strong>Final Reasoning:</strong>
+                                                <p>${finalReasoning}</p>
+                                            </div>
+                                        `;
+                                        completionMessage = `ReAct agent completed successfully in ${completedData.iterations_completed} iterations<br>${cleanMessage}<br>${reasoningHtml}`;
+                                    } else {
+                                        completionMessage = `ReAct agent completed successfully in ${completedData.iterations_completed} iterations<br>${cleanMessage}`;
+                                    }
+                                    progressText = `Completed: ${cleanMessage}`;
+                                } else {
+                                    completionMessage = `ReAct agent finished with status: ${completedData.final_status}<br>${cleanMessage}`;
+                                    progressText = `Finished: ${completedData.final_status}`;
+                                }
+                                
+                                addMessage(completionMessage, 'assistant');
+                                
+                                document.getElementById('progress-fill').style.width = '100%';
+                                document.getElementById('progress-text').textContent = progressText;
+                                
+                                // Display iteration images
+                                if (completedData.images && completedData.images.length > 0) {
+                                    const reactImages = document.getElementById('react-images');
+                                    completedData.images.forEach((imgBase64, index) => {
+                                        const imageItem = document.createElement('div');
+                                        imageItem.className = 'react-image-item';
+                                        imageItem.innerHTML = `
+                                            <img src="data:image/jpeg;base64,${imgBase64}" alt="Iteration ${index + 1}">
+                                            <span>Iteration ${index + 1}</span>
+                                        `;
+                                        reactImages.appendChild(imageItem);
+                                    });
+                                }
+                                
+                                // Close event source
+                                currentEventSource.close();
+                                currentEventSource = null;
+                                
+                                // Reset task ID and stopping flag
+                                currentTaskId = null;
+                                isStopping = false;
+                                
+                                // Re-enable input and button
+                                queryInput.disabled = false;
+                                document.getElementById('send-btn').disabled = false;
+                                
+                            } else if (data.event === 'stopped') {
+                                console.log('Entering stopped branch');
+                                console.log('Processing stopped event:', data);
+                                const stoppedData = data.data;
+                                
+                                // Note: The stop signal message was already added when the user clicked the Stop button
+                                // We don't need to add it again here to avoid duplicate messages
+                                
+                                const message = `ReAct agent stopped by user at iteration ${stoppedData.iterations_completed}`;
+                                console.log('About to call addMessage with:', message);
+                                const messageElement = addMessage(message, 'assistant');
+                                console.log('addMessage returned:', messageElement);
+                                
+                                document.getElementById('progress-text').textContent = 'Stopped by user';
+                                
+                                // Close event source
+                                currentEventSource.close();
+                                currentEventSource = null;
+                                
+                                // Reset task ID and stopping flag
+                                currentTaskId = null;
+                                isStopping = false;
+                                
+                                // Re-enable input and button
+                                queryInput.disabled = false;
+                                document.getElementById('send-btn').disabled = false;
+                                console.log('Stopped event processed, UI reset');
+                                
+                            } else if (data.event === 'error') {
+                                console.log('Entering error branch');
+                                const errorData = data.data;
+                                
+                                addMessage(`ReAct agent error: ${errorData.error}`, 'assistant');
+                                document.getElementById('progress-text').textContent = `Error: ${errorData.error}`;
+                                
+                                // Close event source
+                                currentEventSource.close();
+                                currentEventSource = null;
+                                
+                                // Reset task ID and stopping flag
+                                currentTaskId = null;
+                                isStopping = false;
+                                
+                                // Re-enable input and button
+                                queryInput.disabled = false;
+                                document.getElementById('send-btn').disabled = false;
+                            } else {
+                                console.log('Unknown event type:', data.event);
+                            }
+                        } catch (e) {
+                            console.error('Error parsing SSE event:', e);
+                        }
+                    };
+                    
+                    currentEventSource.onerror = function(error) {
+                        console.error('SSE error:', error);
+                        console.error('EventSource readyState:', currentEventSource.readyState);
+                        currentEventSource.close();
+                        currentEventSource = null;
+                        
+                        // Reset task ID and stopping flag
+                        currentTaskId = null;
+                        isStopping = false;
+                        
+                        // Re-enable input and button
+                        queryInput.disabled = false;
+                        document.getElementById('send-btn').disabled = false;
+                        
+                        addMessage('Connection to ReAct agent lost', 'assistant');
+                    };
+                    
                 } catch (error) {
                     console.error('Failed to run ReAct agent:', error);
                     document.getElementById('error-message').textContent = 'Failed to run ReAct agent: ' + error.message;
                     document.getElementById('progress-text').textContent = 'Error: ' + error.message;
-                } finally {
+                    
+                    // Close event source if open
+                    if (currentEventSource) {
+                        currentEventSource.close();
+                        currentEventSource = null;
+                    }
+                    
+                    // Reset task ID and stopping flag
+                    currentTaskId = null;
+                    isStopping = false;
+                    
                     // Re-enable input and button
                     queryInput.disabled = false;
                     document.getElementById('send-btn').disabled = false;
@@ -897,27 +1051,51 @@ UI-Model API Status: ${data.ui_model_status}`;
                 addMessage(query, 'user');
                 queryInput.value = '';
                 
+                if (!currentTaskId) {
+                    addMessage('No ReAct task is currently running', 'assistant');
+                    return;
+                }
+                
+                if (isStopping) {
+                    addMessage('Stop request already in progress', 'assistant');
+                    return;
+                }
+                
+                isStopping = true;
+                document.getElementById('progress-text').textContent = 'Stopping...';
+                
                 try {
-                    const response = await fetch(`${API_BASE_URL}/stop-react`, {
+                    const response = await fetch(`${API_BASE_URL}/stop-react-task`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
                         },
                         body: JSON.stringify({
-                            session_id: sessionId
+                            task_id: currentTaskId
                         })
                     });
                     
                     const data = await response.json();
+                    logEventSourceState('After stop response received');
                     if (data.success) {
-                        addMessage('ReAct agent stopped successfully', 'assistant');
-                        document.getElementById('progress-text').textContent = 'Stopped by user';
+                        // Check if task has already stopped (received stopped event)
+                        if (!currentTaskId) {
+                            // Task already stopped by stopped event, don't show duplicate message
+                            console.log('Task already stopped, skipping duplicate message');
+                            return;
+                        }
+                        addMessage('ReAct agent stop signal sent, waiting for task to stop...', 'assistant');
+                        // Don't close event source here - wait for 'stopped' event from server
                     } else {
                         addMessage(data.message, 'assistant');
+                        isStopping = false;
+                        document.getElementById('progress-text').textContent = 'Stop failed';
                     }
                 } catch (error) {
                     console.error('Failed to stop ReAct agent:', error);
                     document.getElementById('error-message').textContent = 'Failed to stop ReAct agent: ' + error.message;
+                    isStopping = false;
+                    document.getElementById('progress-text').textContent = 'Stop failed';
                 }
                 return;
             }
@@ -997,14 +1175,24 @@ UI-Model API Status: ${data.ui_model_status}`;
         
         // Add message to chat history
         function addMessage(text, sender) {
+            console.log('addMessage called with:', {text: text.substring(0, 50), sender});
             const chatMessages = document.getElementById('chat-messages');
+            console.log('chat-messages element:', chatMessages);
+            if (!chatMessages) {
+                console.error('chat-messages element not found!');
+                return null;
+            }
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${sender}`;
             messageDiv.innerHTML = text.replace(/\n/g, '<br>');
             chatMessages.appendChild(messageDiv);
+            console.log('Message added to DOM');
             
-            // Scroll to bottom
-            chatMessages.scrollTop = chatMessages.scrollHeight;
+            // Force scroll to bottom
+            setTimeout(() => {
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+                console.log('Forced scroll to bottom, scrollHeight:', chatMessages.scrollHeight);
+            }, 0);
             
             // Return the created message element
             return messageDiv;
@@ -1016,27 +1204,47 @@ UI-Model API Status: ${data.ui_model_status}`;
         document.getElementById('init-btn').addEventListener('click', init);
         
         document.getElementById('stop-react-btn').addEventListener('click', async () => {
+            if (!currentTaskId) {
+                addMessage('No ReAct task is currently running', 'assistant');
+                return;
+            }
+            
+            if (isStopping) {
+                addMessage('Stop request already in progress', 'assistant');
+                return;
+            }
+            
+            isStopping = true;
+            document.getElementById('progress-text').textContent = 'Stopping...';
+            logEventSourceState('Before sending stop request');
+            
+            // Add stop signal message immediately before sending the request
+            addMessage('ReAct agent stop signal sent, waiting for task to stop...', 'assistant');
+            
             try {
-                const response = await fetch(`${API_BASE_URL}/stop-react`, {
+                const response = await fetch(`${API_BASE_URL}/stop-react-task`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        session_id: sessionId
+                        task_id: currentTaskId
                     })
                 });
                 
                 const data = await response.json();
                 if (data.success) {
-                    addMessage('ReAct agent stopped successfully', 'assistant');
-                    document.getElementById('progress-text').textContent = 'Stopped by user';
+                    // Don't close event source here - wait for 'stopped' event from server
                 } else {
                     addMessage(data.message, 'assistant');
+                    isStopping = false;
+                    document.getElementById('progress-text').textContent = 'Stop failed';
                 }
             } catch (error) {
                 console.error('Failed to stop ReAct agent:', error);
                 document.getElementById('error-message').textContent = 'Failed to stop ReAct agent: ' + error.message;
+                isStopping = false;
+                document.getElementById('progress-text').textContent = 'Stop failed';
             }
         });
         

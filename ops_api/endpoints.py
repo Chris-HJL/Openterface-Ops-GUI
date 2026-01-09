@@ -5,6 +5,7 @@ import os
 import base64
 import uuid
 import logging
+import asyncio
 from datetime import datetime
 from typing import Dict
 from fastapi import HTTPException
@@ -14,6 +15,7 @@ from .models import *
 from .session import Session
 from .react_memory import IterationRecord
 from .react_context import ReActContextBuilder
+from .task_manager import task_manager
 from ops_core import (
     Translator,
     ImageEncoder,
@@ -254,6 +256,179 @@ async def build_index(request: BuildIndexRequest):
             message="Failed to build index",
             success=False
         )
+
+# 新的异步任务端点
+@router.post("/react-task", response_model=CreateReactTaskResponse)
+async def create_react_task(request: CreateReactTaskRequest):
+    """创建并启动异步ReAct任务"""
+    logger.info(f"[ReAct Task] Creating task for session {request.session_id}")
+    logger.info(f"[ReAct Task] Task: {request.task}, Max iterations: {request.max_iterations}")
+
+    # 获取会话
+    if request.session_id not in sessions:
+        logger.error(f"[ReAct Task] Session not found: {request.session_id}")
+        raise HTTPException(status_code=404, detail="Session not found")
+    session = sessions[request.session_id]
+
+    # 应用自定义设置
+    if request.model:
+        session.model = request.model
+    if request.rag_enabled is not None:
+        session.rag_enabled = request.rag_enabled
+
+    # 创建任务
+    task_id = await task_manager.create_task(
+        session_id=request.session_id,
+        task_description=request.task,
+        max_iterations=request.max_iterations,
+        session=session
+    )
+
+    # 启动任务
+    await task_manager.start_task(task_id)
+
+    logger.info(f"[ReAct Task] Task {task_id} created and started")
+
+    return CreateReactTaskResponse(
+        task_id=task_id,
+        message="ReAct task created and started",
+        success=True
+    )
+
+
+@router.get("/react-stream/{task_id}")
+async def react_stream(task_id: str):
+    """SSE流式推送任务进度"""
+    from fastapi.responses import StreamingResponse
+    import json
+
+    task = task_manager.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    async def event_generator():
+        try:
+            while True:
+                # 检查任务状态
+                if task.status == "completed":
+                    logger.info(f"[ReAct Stream] Task completed, sending completed event")
+                    data = {
+                        "event": "completed",
+                        "data": {
+                            "iterations_completed": task.current_iteration,
+                            "final_status": task.final_status,
+                            "message": task.message,
+                            "images": task.iteration_images
+                        }
+                    }
+                    yield f"data: {json.dumps(data)}\n\n"
+                    break
+                elif task.status == "stopped":
+                    logger.info(f"[ReAct Stream] Task stopped, sending stopped event. Iterations: {task.current_iteration}, Task ID: {task.task_id}")
+                    data = {
+                        "event": "stopped",
+                        "data": {
+                            "iterations_completed": task.current_iteration
+                        }
+                    }
+                    event_json = json.dumps(data)
+                    logger.info(f"[ReAct Stream] Sending event JSON: {event_json}")
+                    yield f"data: {event_json}\n\n"
+                    logger.info(f"[ReAct Stream] Stopped event sent successfully")
+                    break
+                elif task.status == "error":
+                    logger.info(f"[ReAct Stream] Task error, sending error event")
+                    data = {
+                        "event": "error",
+                        "data": {
+                            "error": task.error_message
+                        }
+                    }
+                    yield f"data: {json.dumps(data)}\n\n"
+                    break
+
+                # 从事件队列获取更新
+                try:
+                    event = await asyncio.wait_for(task.event_queue.get(), timeout=0.5)
+                    if event["type"] == "progress":
+                        progress_data = event["data"]
+                        data = {
+                            "event": "progress",
+                            "data": {
+                                "iteration": task.current_iteration,
+                                "max_iterations": task.max_iterations,
+                                "status": progress_data.get("status"),
+                                "action": progress_data.get("action"),
+                                "element": progress_data.get("element"),
+                                "reasoning": progress_data.get("reasoning"),
+                                "task_status": progress_data.get("task_status"),
+                                "image_path": progress_data.get("image_path")
+                            }
+                        }
+                        yield f"data: {json.dumps(data)}\n\n"
+                except asyncio.TimeoutError:
+                    # 超时继续循环
+                    continue
+
+        except Exception as e:
+            logger.error(f"[ReAct Stream] Error in event generator: {str(e)}", exc_info=True)
+            data = {
+                "event": "error",
+                "data": {
+                    "error": str(e)
+                }
+            }
+            yield f"data: {json.dumps(data)}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
+
+
+@router.get("/react-status/{task_id}", response_model=ReactTaskStatusResponse)
+async def get_react_status(task_id: str):
+    """获取任务状态"""
+    task = task_manager.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    return ReactTaskStatusResponse(
+        task_id=task_id,
+        status=task.status,
+        current_iteration=task.current_iteration,
+        max_iterations=task.max_iterations,
+        last_action=task.last_action,
+        last_element=task.last_element,
+        last_reasoning=task.last_reasoning,
+        last_task_status=task.last_task_status,
+        last_status=task.last_status,
+        created_at=task.created_at.isoformat(),
+        updated_at=task.updated_at.isoformat()
+    )
+
+
+@router.post("/stop-react-task")
+async def stop_react_task(request: StopReactTaskRequest):
+    """停止异步ReAct任务"""
+    logger.info(f"[ReAct Task] Stopping task {request.task_id}")
+
+    task = task_manager.get_task(request.task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    await task_manager.stop_task(request.task_id)
+
+    return {
+        "message": "Task stop signal sent",
+        "task_id": request.task_id,
+        "success": True
+    }
 
 @router.get("/status/{session_id}", response_model=StatusResponse)
 async def get_status(session_id: str):
