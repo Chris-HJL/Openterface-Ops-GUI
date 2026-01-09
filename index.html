@@ -253,6 +253,159 @@
         .stop-btn:hover {
             background-color: #d32f2f;
         }
+
+        /* Approval Dialog Styles */
+        .approval-dialog {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .approval-content {
+            background-color: white;
+            border-radius: 8px;
+            padding: 30px;
+            max-width: 600px;
+            width: 90%;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            animation: slideIn 0.3s ease-in-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .approval-content h3 {
+            color: #f44336;
+            margin-bottom: 20px;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .approval-details {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+
+        .approval-details p {
+            margin: 8px 0;
+            color: #856404;
+            font-size: 14px;
+        }
+
+        .approval-details strong {
+            color: #333;
+            font-weight: 600;
+        }
+
+        .approval-image {
+            margin-bottom: 20px;
+            text-align: center;
+            border: 2px solid #ffc107;
+            border-radius: 4px;
+            padding: 10px;
+            background-color: #fff;
+        }
+
+        .approval-image img {
+            max-width: 100%;
+            border-radius: 4px;
+        }
+
+        .approval-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn-approve,
+        .btn-reject,
+        .btn-approve-all {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            min-width: 120px;
+        }
+
+        .btn-approve {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .btn-approve:hover {
+            background-color: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(76, 175, 80, 0.3);
+        }
+
+        .btn-reject {
+            background-color: #f44336;
+            color: white;
+        }
+
+        .btn-reject:hover {
+            background-color: #d32f2f;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(244, 67, 54, 0.3);
+        }
+
+        .btn-approve-all {
+            background-color: #2196F3;
+            color: white;
+        }
+
+        .btn-approve-all:hover {
+            background-color: #1976D2;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(33, 150, 243, 0.3);
+        }
+
+        @media (max-width: 768px) {
+            .approval-content {
+                padding: 20px;
+                max-width: 95%;
+            }
+
+            .approval-actions {
+                flex-direction: column;
+            }
+
+            .btn-approve,
+            .btn-reject,
+            .btn-approve-all {
+                width: 100%;
+            }
+        }
         
         .final-reasoning {
             background-color: #fff3cd;
@@ -368,7 +521,29 @@ export UI_API_KEY=your_ui_api_key</pre>
             <div class="react-images" id="react-images">
             </div>
         </div>
-        
+
+        <!-- Approval Dialog -->
+        <div id="approval-dialog" class="approval-dialog" style="display: none;">
+            <div class="approval-content">
+                <h3>⚠️ Dangerous Operation Requires Approval</h3>
+                <div class="approval-details">
+                    <p><strong>Iteration:</strong> <span id="approval-iteration">-</span></p>
+                    <p><strong>Action:</strong> <span id="approval-action">-</span></p>
+                    <p><strong>Element:</strong> <span id="approval-element">-</span></p>
+                    <p><strong>Reasoning:</strong> <span id="approval-reasoning">-</span></p>
+                    <p><strong>Risk Level:</strong> <span id="approval-risk">-</span></p>
+                </div>
+                <div class="approval-image" id="approval-image-container" style="display: none;">
+                    <img id="approval-image" src="" alt="Current screen">
+                </div>
+                <div class="approval-actions">
+                    <button class="btn-approve" onclick="approveAction()">Approve</button>
+                    <button class="btn-reject" onclick="rejectAction()">Reject</button>
+                    <button class="btn-approve-all" onclick="approveAllActions()">Approve All Future Actions</button>
+                </div>
+            </div>
+        </div>
+
         <div class="chat-section">
             <div class="chat-messages" id="chat-messages">
                 <div class="message assistant">
@@ -825,7 +1000,8 @@ UI-Model API Status: ${data.ui_model_status}`;
                         body: JSON.stringify({
                             session_id: sessionId,
                             task: task,
-                            max_iterations: maxIterations
+                            max_iterations: maxIterations,
+                            approval_policy: 'manual'
                         })
                     });
                     
@@ -886,6 +1062,14 @@ UI-Model API Status: ${data.ui_model_status}`;
                                     </div>
                                 `;
                                 addMessage(progressMessage, 'assistant');
+                                
+                            } else if (data.event === 'approval_required') {
+                                console.log('Entering approval_required branch');
+                                const approvalData = data.data;
+                                console.log('Approval required:', approvalData);
+                                
+                                // Show approval dialog
+                                showApprovalDialog(approvalData);
                                 
                             } else if (data.event === 'completed') {
                                 console.log('Entering completed branch');
@@ -1196,6 +1380,128 @@ UI-Model API Status: ${data.ui_model_status}`;
             
             // Return the created message element
             return messageDiv;
+        }
+
+        // Approval dialog functions
+        function showApprovalDialog(approvalData) {
+            document.getElementById('approval-iteration').textContent = approvalData.iteration;
+            document.getElementById('approval-action').textContent = approvalData.action;
+            document.getElementById('approval-element').textContent = approvalData.element;
+            document.getElementById('approval-reasoning').textContent = approvalData.reasoning || '无';
+
+            const riskSpan = document.getElementById('approval-risk');
+            if (approvalData.is_dangerous) {
+                riskSpan.textContent = '🔴 High Risk';
+                riskSpan.style.color = '#f44336';
+            } else {
+                riskSpan.textContent = '🟡 Medium Risk';
+                riskSpan.style.color = '#ff9800';
+            }
+
+            if (approvalData.image) {
+                document.getElementById('approval-image').src = `data:image/jpeg;base64,${approvalData.image}`;
+                document.getElementById('approval-image-container').style.display = 'block';
+            } else {
+                document.getElementById('approval-image-container').style.display = 'none';
+            }
+
+            document.getElementById('approval-dialog').style.display = 'flex';
+        }
+
+        async function approveAction() {
+            if (!currentTaskId) {
+                console.error('No task ID available');
+                return;
+            }
+
+            // Close dialog immediately
+            closeApprovalDialog();
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/approve-action/${currentTaskId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    addMessage(`✅ Action approved (iteration ${data.iteration}), task continues`, 'assistant');
+                } else {
+                    addMessage(`❌ Approval failed: ${data.message}`, 'assistant');
+                }
+            } catch (error) {
+                console.error('Failed to approve action:', error);
+                addMessage(`❌ Approval failed: ${error.message}`, 'assistant');
+            }
+        }
+
+        async function rejectAction() {
+            const reason = prompt('Enter rejection reason (optional):', 'User rejected');
+
+            if (!currentTaskId) {
+                console.error('No task ID available');
+                return;
+            }
+
+            // Close dialog immediately
+            closeApprovalDialog();
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/reject-action/${currentTaskId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ reason: reason || 'User rejected' })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    addMessage(`🚫 Action rejected (iteration ${data.iteration}), task stopped`, 'assistant');
+                    document.getElementById('progress-text').textContent = 'Stopped by user';
+
+                    document.getElementById('query-input').disabled = false;
+                    document.getElementById('send-btn').disabled = false;
+                } else {
+                    addMessage(`❌ Rejection failed: ${data.message}`, 'assistant');
+                }
+            } catch (error) {
+                console.error('Failed to reject action:', error);
+                addMessage(`❌ Rejection failed: ${error.message}`, 'assistant');
+            }
+        }
+
+        async function approveAllActions() {
+            if (!currentTaskId) {
+                console.error('No task ID available');
+                return;
+            }
+
+            if (!confirm('Are you sure you want to approve all future actions? This will switch to auto-approval mode.')) {
+                return;
+            }
+
+            // Close dialog immediately
+            closeApprovalDialog();
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/set-approval-policy/${currentTaskId}?policy=auto`, {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    addMessage(`✅ Switched to auto-approval mode, future actions will be executed automatically`, 'assistant');
+                } else {
+                    addMessage(`❌ Switch failed: ${data.message}`, 'assistant');
+                }
+            } catch (error) {
+                console.error('Failed to approve all actions:', error);
+                addMessage(`❌ Switch failed: ${error.message}`, 'assistant');
+            }
+        }
+
+        function closeApprovalDialog() {
+            document.getElementById('approval-dialog').style.display = 'none';
         }
         
         // Event listeners

@@ -7,7 +7,7 @@ import logging
 import os
 import re
 import uuid
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 from datetime import datetime
 
 from ops_core import (
@@ -40,7 +40,7 @@ class ReActTask:
         self.session = session
 
         # 状态
-        self.status = "pending"
+        self.status = "pending"  # pending, running, waiting_approval, completed, stopped, error, rejected
         self.current_iteration = 0
         self.final_status = None
         self.message = None
@@ -54,8 +54,20 @@ class ReActTask:
         self.last_image = None
         self.last_status = None
 
+        # 审核相关
+        self.pending_approval = None
+        self.approval_history = []
+        self.approval_policy = "manual"  # auto, manual, strict
+        self.dangerous_actions = [
+            "Delete", "Format", "Uninstall", "Remove",
+            "Erase", "Wipe", "Clear", "Reset", "Destroy",
+            "删除", "格式化", "卸载", "移除",
+            "擦除", "清除", "重置", "销毁"
+        ]
+
         # 控制标志
         self.should_stop = False
+        self.approval_result = None  # approved, rejected
 
         # 时间戳
         self.created_at = datetime.now()
@@ -66,6 +78,9 @@ class ReActTask:
 
         # 事件队列（用于SSE推送）
         self.event_queue = asyncio.Queue()
+
+        # 审核事件（用于同步等待）
+        self.approval_event = asyncio.Event()
 
     def update_progress(self, **kwargs):
         """更新进度"""
@@ -129,6 +144,73 @@ class ReActTask:
         except asyncio.QueueFull:
             pass
 
+    def request_approval(self, approval_data):
+        """请求审核"""
+        self.status = "waiting_approval"
+        self.pending_approval = approval_data
+        self.updated_at = datetime.now()
+
+        try:
+            self.event_queue.put_nowait({
+                "type": "approval_required",
+                "data": approval_data
+            })
+        except asyncio.QueueFull:
+            pass
+
+        logger.info(f"[TaskManager] Approval requested for task {self.task_id}")
+
+    def approve(self):
+        """批准操作"""
+        self.status = "running"
+        self.approval_result = "approved"
+        self.pending_approval = None
+        self.updated_at = datetime.now()
+
+        self.approval_history.append({
+            "timestamp": datetime.now().isoformat(),
+            "action": self.last_action,
+            "element": self.last_element,
+            "decision": "approved",
+            "iteration": self.current_iteration
+        })
+
+        self.approval_event.set()
+        self.approval_event.clear()
+
+        logger.info(f"[TaskManager] Action approved for task {self.task_id}")
+
+    def reject(self, reason: str):
+        """拒绝操作"""
+        self.status = "rejected"
+        self.approval_result = "rejected"
+        self.should_stop = True
+        self.updated_at = datetime.now()
+
+        self.approval_history.append({
+            "timestamp": datetime.now().isoformat(),
+            "action": self.last_action,
+            "element": self.last_element,
+            "decision": "rejected",
+            "reason": reason,
+            "iteration": self.current_iteration
+        })
+
+        self.approval_event.set()
+        self.approval_event.clear()
+
+        logger.info(f"[TaskManager] Action rejected for task {self.task_id}: {reason}")
+
+    async def wait_for_approval(self, timeout: int = 300) -> str:
+        """等待审核结果"""
+        try:
+            await asyncio.wait_for(self.approval_event.wait(), timeout=timeout)
+            return self.approval_result
+        except asyncio.TimeoutError:
+            logger.warning(f"[TaskManager] Approval timeout for task {self.task_id}")
+            self.should_stop = True
+            return "timeout"
+
 
 class ReActTaskManager:
     """ReAct任务管理器"""
@@ -137,7 +219,7 @@ class ReActTaskManager:
         self.tasks: Dict[str, ReActTask] = {}
         self.lock = asyncio.Lock()
 
-    async def create_task(self, session_id: str, task_description: str, max_iterations: int, session) -> str:
+    async def create_task(self, session_id: str, task_description: str, max_iterations: int, session, approval_policy: str = "manual") -> str:
         """创建新任务"""
         task_id = str(uuid.uuid4())
         task = ReActTask(
@@ -147,11 +229,12 @@ class ReActTaskManager:
             max_iterations=max_iterations,
             session=session
         )
+        task.approval_policy = approval_policy
 
         async with self.lock:
             self.tasks[task_id] = task
 
-        logger.info(f"[TaskManager] Created task {task_id} for session {session_id}")
+        logger.info(f"[TaskManager] Created task {task_id} for session {session_id} with policy {approval_policy}")
         return task_id
 
     async def start_task(self, task_id: str):
@@ -174,9 +257,48 @@ class ReActTaskManager:
             task.stop()
             logger.info(f"[TaskManager] Stopping task {task_id}")
 
+    async def approve_action(self, task_id: str):
+        """批准操作"""
+        task = self.tasks.get(task_id)
+        if task and task.status == "waiting_approval":
+            task.approve()
+            return True
+        return False
+
+    async def reject_action(self, task_id: str, reason: str):
+        """拒绝操作"""
+        task = self.tasks.get(task_id)
+        if task and task.status == "waiting_approval":
+            task.reject(reason)
+            return True
+        return False
+
+    def set_approval_policy(self, task_id: str, policy: str):
+        """设置审核策略"""
+        task = self.tasks.get(task_id)
+        if task:
+            task.approval_policy = policy
+            logger.info(f"[TaskManager] Set approval policy to {policy} for task {task_id}")
+
     def get_task(self, task_id: str) -> Optional[ReActTask]:
         """获取任务"""
         return self.tasks.get(task_id)
+
+    def _is_dangerous_action(self, action: str, element: str, dangerous_keywords: List[str]) -> bool:
+        """判断是否为危险操作"""
+        dangerous_action_types = [
+            "delete", "format", "uninstall", "destroy",
+            "删除", "格式化", "卸载", "销毁"
+        ]
+        if action and action.lower() in dangerous_action_types:
+            return True
+
+        if element:
+            element_lower = element.lower()
+            if any(keyword.lower() in element_lower for keyword in dangerous_keywords):
+                return True
+
+        return False
 
     async def _execute_task(self, task: ReActTask):
         """执行任务（异步）"""
@@ -320,6 +442,52 @@ Else if completed, also provide:
 
                     task.complete("completed", message)
                     return
+
+                # 保存最后一次执行信息
+                task.last_action = action
+                task.last_element = element
+                task.last_reasoning = reasoning
+                task.last_task_status = task_status
+                task.last_image = image_path
+
+                # 危险操作检测和审核
+                needs_approval = False
+                is_dangerous = False
+
+                if task.approval_policy == "strict":
+                    needs_approval = True
+                    is_dangerous = True
+                elif task.approval_policy == "manual":
+                    is_dangerous = self._is_dangerous_action(action, element, task.dangerous_actions)
+                    needs_approval = is_dangerous
+
+                if needs_approval and action and action != "none":
+                    logger.info(f"[TaskManager] Action requires approval: {action} on {element}")
+
+                    # 请求审核
+                    approval_data = {
+                        "iteration": iteration_num,
+                        "action": action,
+                        "element": element,
+                        "reasoning": reasoning,
+                        "is_dangerous": is_dangerous,
+                        "image": image_to_base64(image_path) if image_path else None
+                    }
+                    task.request_approval(approval_data)
+
+                    # 等待审核结果
+                    approval_result = await task.wait_for_approval(timeout=300)
+
+                    if approval_result == "rejected":
+                        logger.info(f"[TaskManager] Action rejected, stopping task")
+                        task.error(f"Action rejected by user: {task.approval_history[-1].get('reason', 'No reason')}")
+                        return
+                    elif approval_result == "timeout":
+                        logger.info(f"[TaskManager] Approval timeout, stopping task")
+                        task.error("Approval timeout")
+                        return
+                    elif approval_result == "approved":
+                        logger.info(f"[TaskManager] Action approved, continuing execution")
 
                 # 处理UI操作
                 execution_success = False

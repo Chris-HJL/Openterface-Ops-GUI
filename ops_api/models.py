@@ -55,6 +55,7 @@ class CreateReactTaskRequest(BaseModel):
     max_iterations: Optional[int] = 20
     rag_enabled: Optional[bool] = None
     model: Optional[str] = None
+    approval_policy: Optional[str] = "manual"
 
 class StopReactTaskRequest(BaseModel):
     task_id: str
@@ -82,6 +83,8 @@ class ReactTaskStatusResponse(BaseModel):
     last_status: Optional[str] = None
     created_at: str
     updated_at: str
+    approval_policy: Optional[str] = None
+    pending_approval: Optional[Dict[str, Any]] = None
 
 class ReactProgressData(BaseModel):
     iteration: int
@@ -130,3 +133,21 @@ class ReactResponse(BaseModel):
     final_status: str
     success: bool
     images: Optional[List[str]] = None  # List of base64 images from each iteration
+
+class ApprovalRequest(BaseModel):
+    reason: Optional[str] = None
+
+class RejectionRequest(BaseModel):
+    reason: str = "User rejected"
+
+class ApprovalResponse(BaseModel):
+    success: bool
+    message: str
+    task_id: Optional[str] = None
+    iteration: Optional[int] = None
+
+class ApprovalHistoryResponse(BaseModel):
+    task_id: str
+    approval_policy: str
+    approval_history: List[Dict[str, Any]]
+    success: bool

@@ -262,7 +262,7 @@ async def build_index(request: BuildIndexRequest):
 async def create_react_task(request: CreateReactTaskRequest):
     """创建并启动异步ReAct任务"""
     logger.info(f"[ReAct Task] Creating task for session {request.session_id}")
-    logger.info(f"[ReAct Task] Task: {request.task}, Max iterations: {request.max_iterations}")
+    logger.info(f"[ReAct Task] Task: {request.task}, Max iterations: {request.max_iterations}, Approval policy: {request.approval_policy}")
 
     # 获取会话
     if request.session_id not in sessions:
@@ -281,7 +281,8 @@ async def create_react_task(request: CreateReactTaskRequest):
         session_id=request.session_id,
         task_description=request.task,
         max_iterations=request.max_iterations,
-        session=session
+        session=session,
+        approval_policy=request.approval_policy
     )
 
     # 启动任务
@@ -366,6 +367,12 @@ async def react_stream(task_id: str):
                             }
                         }
                         yield f"data: {json.dumps(data)}\n\n"
+                    elif event["type"] == "approval_required":
+                        data = {
+                            "event": "approval_required",
+                            "data": event["data"]
+                        }
+                        yield f"data: {json.dumps(data)}\n\n"
                 except asyncio.TimeoutError:
                     # 超时继续循环
                     continue
@@ -409,7 +416,9 @@ async def get_react_status(task_id: str):
         last_task_status=task.last_task_status,
         last_status=task.last_status,
         created_at=task.created_at.isoformat(),
-        updated_at=task.updated_at.isoformat()
+        updated_at=task.updated_at.isoformat(),
+        approval_policy=task.approval_policy,
+        pending_approval=task.pending_approval
     )
 
 
@@ -429,6 +438,90 @@ async def stop_react_task(request: StopReactTaskRequest):
         "task_id": request.task_id,
         "success": True
     }
+
+@router.post("/approve-action/{task_id}", response_model=ApprovalResponse)
+async def approve_action(task_id: str, request: ApprovalRequest):
+    """批准操作"""
+    logger.info(f"[ReAct Task] Approving action for task {task_id}")
+
+    task = task_manager.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    success = await task_manager.approve_action(task_id)
+    if success:
+        return ApprovalResponse(
+            success=True,
+            message="Action approved",
+            task_id=task_id,
+            iteration=task.current_iteration
+        )
+    else:
+        return ApprovalResponse(
+            success=False,
+            message="Failed to approve action - task not in waiting_approval state",
+            task_id=task_id
+        )
+
+@router.post("/reject-action/{task_id}", response_model=ApprovalResponse)
+async def reject_action(task_id: str, request: RejectionRequest):
+    """拒绝操作"""
+    logger.info(f"[ReAct Task] Rejecting action for task {task_id}: {request.reason}")
+
+    task = task_manager.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    success = await task_manager.reject_action(task_id, request.reason)
+    if success:
+        return ApprovalResponse(
+            success=True,
+            message="Action rejected",
+            task_id=task_id,
+            iteration=task.current_iteration
+        )
+    else:
+        return ApprovalResponse(
+            success=False,
+            message="Failed to reject action - task not in waiting_approval state",
+            task_id=task_id
+        )
+
+@router.post("/set-approval-policy/{task_id}")
+async def set_approval_policy(task_id: str, policy: str):
+    """设置审核策略"""
+    logger.info(f"[ReAct Task] Setting approval policy for task {task_id} to {policy}")
+
+    task = task_manager.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if policy not in ["auto", "manual", "strict"]:
+        raise HTTPException(status_code=400, detail="Invalid policy. Must be 'auto', 'manual', or 'strict'")
+
+    task_manager.set_approval_policy(task_id, policy)
+
+    return {
+        "message": f"Approval policy set to {policy}",
+        "task_id": task_id,
+        "success": True
+    }
+
+@router.get("/approval-history/{task_id}", response_model=ApprovalHistoryResponse)
+async def get_approval_history(task_id: str):
+    """获取审核历史"""
+    logger.info(f"[ReAct Task] Getting approval history for task {task_id}")
+
+    task = task_manager.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    return ApprovalHistoryResponse(
+        task_id=task_id,
+        approval_policy=task.approval_policy,
+        approval_history=task.approval_history,
+        success=True
+    )
 
 @router.get("/status/{session_id}", response_model=StatusResponse)
 async def get_status(session_id: str):
