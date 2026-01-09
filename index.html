@@ -530,6 +530,7 @@ export UI_API_KEY=your_ui_api_key</pre>
                     <p><strong>Iteration:</strong> <span id="approval-iteration">-</span></p>
                     <p><strong>Action:</strong> <span id="approval-action">-</span></p>
                     <p><strong>Element:</strong> <span id="approval-element">-</span></p>
+                    <p id="approval-key-content-row" style="display: none;"><strong>Key Content:</strong> <span id="approval-key-content">-</span></p>
                     <p><strong>Reasoning:</strong> <span id="approval-reasoning">-</span></p>
                     <p><strong>Risk Level:</strong> <span id="approval-risk">-</span></p>
                 </div>
@@ -1388,6 +1389,15 @@ UI-Model API Status: ${data.ui_model_status}`;
             document.getElementById('approval-action').textContent = approvalData.action;
             document.getElementById('approval-element').textContent = approvalData.element;
             document.getElementById('approval-reasoning').textContent = approvalData.reasoning || '无';
+
+            const keyContentRow = document.getElementById('approval-key-content-row');
+            const keyContentSpan = document.getElementById('approval-key-content');
+            if (approvalData.key_content && approvalData.key_content.trim() !== '') {
+                keyContentRow.style.display = 'block';
+                keyContentSpan.textContent = approvalData.key_content;
+            } else {
+                keyContentRow.style.display = 'none';
+            }
 
             const riskSpan = document.getElementById('approval-risk');
             if (approvalData.is_dangerous) {

@@ -478,6 +478,7 @@ Else if completed, also provide:
                         "iteration": iteration_num,
                         "action": action,
                         "element": element,
+                        "key_content": key_content,
                         "reasoning": reasoning,
                         "is_dangerous": is_dangerous,
                         "image": image_to_base64(image_path) if image_path else None
