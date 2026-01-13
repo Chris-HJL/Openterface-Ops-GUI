@@ -60,10 +60,14 @@ Please analyze the current screen and determine the next action based on:
 3. Successful and failed actions patterns
 4. Current screen state
 
-Respond with:
-- <task_status>completed</task_status> or <task_status>in_progress</task_status>
-- <action>Click</action> or <action>Double Click</action> or <action>none</action>
-- <element>description of UI element</element>
-- <reasoning>explanation of next action, considering previous iterations</reasoning>
+Respond with one of the following:
+- <task_status>completed</task_status> if the task is done
+- <task_status>in_progress</task_status> if the task is not yet completed or the screen may still be loading
+
+If the screen may still be loading, no additional information is needed,
+Else if not completed, also provide:
+- the next action to perform
+Else if completed, also provide:
+- <final_reasoning>brief explanation of the task completion</final_reasoning>
 """
         return enhanced_prompt

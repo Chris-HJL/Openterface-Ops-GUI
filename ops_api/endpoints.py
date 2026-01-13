@@ -735,20 +735,7 @@ async def react(request: ReactRequest):
             logger.info(f"[ReAct] Got image: {image_path}")
 
             # 构建基础提示
-            base_prompt = f"""
-Please analyze the current screen and determine if the task has been completed.
-Respond with one of the following:
-- <task_status>completed</task_status> if the task is done
-- <task_status>in_progress</task_status> if the task is not yet completed or the screen may still be loading
-
-If the screen may still be loading, no other information is needed.
-Else if not completed, also provide:
-- <action>Click</action> or <action>Double Click</action> or <action>none</action>
-- <element>description of UI element to interact with</element> (if action is Click or Double Click)
-- <reasoning>brief explanation of what needs to be done next</reasoning>
-Else if completed, also provide:
-- <final_reasoning>brief explanation of the task completion</final_reasoning>
-"""
+            base_prompt = session.react_task_description
 
             # 使用记忆构建增强提示
             enhanced_prompt = context_builder.build_enhanced_prompt(base_prompt, iteration_num)

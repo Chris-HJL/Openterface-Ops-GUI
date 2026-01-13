@@ -41,7 +41,8 @@ class UIInsClient:
             messages = [
                 {
                     "role":"system",
-                    "content": "Provide the coordinate of the element in the screenshot. The coordinate should be in the format of [x, y], enclosed in square brackets."
+                    # "content": "Provide the coordinate of the element in the screenshot. The coordinate should be in the format of [x, y], enclosed in square brackets."
+                    "content": "Locate the UI element specified by the user instruction and provide the coordinate in the format of [x, y]."
                 },
                 {
                     "role": "user",
