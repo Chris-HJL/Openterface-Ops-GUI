@@ -536,6 +536,7 @@ class ReActTaskManager:
                     iteration=iteration_num,
                     action=action,
                     element=element,
+                    key_content=key_content,
                     reasoning=reasoning,
                     task_status=task_status
                 )

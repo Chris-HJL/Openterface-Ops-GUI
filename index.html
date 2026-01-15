@@ -1045,8 +1045,14 @@ UI-Model API Status: ${data.ui_model_status}`;
                                 
                                 // Update progress text - only show action and reasoning
                                 let statusText = `Iteration ${progressData.iteration}/${progressData.max_iterations}`;
-                                if (progressData.action && progressData.element) {
-                                    statusText += `\nAction: ${progressData.action} on ${progressData.element}`;
+                                if (progressData.action) {
+                                    if (progressData.action === 'Keyboard' && progressData.key_content) {
+                                        statusText += `\nAction: ${progressData.action} (Key: ${progressData.key_content})`;
+                                    } else if (progressData.element) {
+                                        statusText += `\nAction: ${progressData.action} on ${progressData.element}`;
+                                    } else {
+                                        statusText += `\nAction: ${progressData.action}`;
+                                    }
                                 }
                                 if (progressData.reasoning) {
                                     statusText += `\nReasoning: ${progressData.reasoning}`;
@@ -1057,8 +1063,8 @@ UI-Model API Status: ${data.ui_model_status}`;
                                 const progressMessage = `
                                     <div class="react-progress">
                                         <strong>Iteration ${progressData.iteration}/${progressData.max_iterations}</strong><br>
-                                        ${progressData.action ? `Action: ${progressData.action}` : ''}<br>
-                                        ${progressData.element ? `Element: ${progressData.element}` : ''}<br>
+                                        ${progressData.action ? `Action: ${progressData.action}` : ''}${progressData.action === 'Keyboard' && progressData.key_content ? ` (Key: ${progressData.key_content})` : ''}<br>
+                                        ${progressData.element && progressData.action !== 'Keyboard' ? `Element: ${progressData.element}` : ''}<br>
                                         ${progressData.reasoning ? `Reasoning: ${progressData.reasoning}` : ''}
                                     </div>
                                 `;

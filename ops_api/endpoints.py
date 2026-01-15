@@ -361,6 +361,7 @@ async def react_stream(task_id: str):
                                 "status": progress_data.get("status"),
                                 "action": progress_data.get("action"),
                                 "element": progress_data.get("element"),
+                                "key_content": progress_data.get("key_content"),
                                 "reasoning": progress_data.get("reasoning"),
                                 "task_status": progress_data.get("task_status"),
                                 "image_path": progress_data.get("image_path")
