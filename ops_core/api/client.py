@@ -101,14 +101,14 @@ class LLMAPIClient:
                                 - Enclose the text (English only) to input with <input></input> if the action is Input, e.g. <input>Hello World</input>.
                                 - Enclose the key to press with <key></key> if the action is Keyboard, e.g. <key>Left</key>, <key>Enter</key>.
                                 - Enclose the brief explanation of what needs to be done next with <reasoning></reasoning>, e.g. <reasoning>Click the OK Button to confirm</reasoning>.
-                            # Scenario:
+                            # Scenarios:
                                 ## BIOS
                                     - Only use Keyboard action, unless there is a mouse cursor shown in the image.
                                     - When only one menu/tab/screen is visible, e.g. the 'chipset' screen, and the item desired is not in the current screen, use <key>Esc</key> to exit current screen and back to screen selection.
                                     - Usually <key>Enter</key> is used to expand or confirm or select an item.
                                     - Navigate to the desired item before using <key>Enter</key> to select/expand it.
-                                ## Windows and Linux
-                                    - To open an app with desktop icon, use <action>Double Click</action> on the icon. To open an app with icon in Start Menu or Taskbar, use <action>Click</action> on the icon.
+                                ## Windows and Linux with GUI
+                                    - To open an app with icon on desktop or in a folder window, use <action>Double Click</action> on the icon. To open an app with icon in Start Menu or Taskbar, use <action>Click</action> on the icon.
                                     - Before using Input action, if the text box is not focused or active, use <action>Click</action> to focus/activate it.
                                     - In Windows, copy and paste actions are better to be performed with right-click context menu. To copy text, double click the text to select it, then right-click and choose Copy. To paste text, right-click in the desired location and choose Paste.
                                     - Prefer using mouse actions over keyboard actions, unless there is a specific reason to use keyboard actions.

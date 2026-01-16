@@ -60,6 +60,8 @@ Please analyze the current screen and determine the next action based on:
 3. Successful and failed actions patterns
 4. Current screen state
 
+Note: you need to determine if the previous action was successful or the task is completed based on both the 'Result' field in the previous iterations summary and the current screen state. It happens that the previous action may be successful but the current screen state may not reflect it, in such cases, you need to perform the action again in a different way.
+
 Respond with one of the following:
 - <task_status>completed</task_status> if the task is done
 - <task_status>in_progress</task_status> if the task is not yet completed or the screen may still be loading
