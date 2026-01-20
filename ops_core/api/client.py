@@ -97,7 +97,7 @@ class LLMAPIClient:
                             # Output Format:
                                 - Enclose your response with <Answer>Your response</Answer>.
                                 - Enclose the action to perform with <action></action>, e.g. <action>Click</action>, <action>Keyboard</action>.
-                                - Enclose the element name with with brief description <element></element> where the action should be performed, e.g. <element>browser icon looks like 'e' in the taskbar</element>.
+                                - Enclose the element name (original language and English) with with brief description <element></element> where the action should be performed, e.g. <element>browser icon looks like 'e' in the taskbar</element>.
                                 - Enclose the text (English only) to input with <input></input> if the action is Input, e.g. <input>Hello World</input>.
                                 - Enclose the key to press with <key></key> if the action is Keyboard, e.g. <key>Left</key>, <key>Enter</key>.
                                 - Enclose the brief explanation of what needs to be done next with <reasoning></reasoning>, e.g. <reasoning>Click the OK Button to confirm</reasoning>.
@@ -113,6 +113,11 @@ class LLMAPIClient:
                                     - In Windows, copy and paste actions are better to be performed with right-click context menu. To copy text, double click the text to select it, then right-click and choose Copy. To paste text, right-click in the desired location and choose Paste.
                                     - Prefer using mouse actions over keyboard actions, unless there is a specific reason to use keyboard actions.
                                     - To scroll up or down, use <action>Keyboard</action> with <key>PgUp</key> or <key>PgDn</key> key.
+                                    - During Windows OS installation, when the screen displays something like 'Getting ready' or '准备就绪', it doesn't really mean the installation is done, 
+                                      but it means the rest of installation process is ready to continue. In this case, you should wait for the installation process to continue, 
+                                      until desktop is reached. The only criteria of installation completion is desktop being visible.
+                                      When you are required to select the drive/partition to install Windows, format the drive/partition before installation.
+                                    - When the screen displays something like 'press any key to boot from USB', ignore it and continue with your task.
                         """
                     })
             else:
@@ -123,7 +128,7 @@ class LLMAPIClient:
 
             payload = {
                 "messages": messages,
-                "max_tokens": 8192,
+                "max_tokens": 6000,
                 "model": self.model
             }
 

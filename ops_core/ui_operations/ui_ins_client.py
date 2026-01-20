@@ -55,7 +55,7 @@ class UIInsClient:
 
             payload = {
                 "messages": messages,
-                "max_tokens": 500,
+                "max_tokens": 1000,
                 "model": self.model
             }
 
