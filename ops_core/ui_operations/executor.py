@@ -52,6 +52,7 @@ class CommandExecutor:
             if action in ["Click", "Double Click", "Right Click"] and element:
                 # 调用UI-Model API获取坐标
                 ui_model_response = self.ui_ins_client.call_api(image_path, element)
+                print(f"UI-Model Response: {ui_model_response}")
 
                 # 解析坐标
                 point_x, point_y = self.parser.parse_coordinates(ui_model_response)

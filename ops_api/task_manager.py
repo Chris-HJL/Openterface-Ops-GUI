@@ -317,7 +317,7 @@ class ReActTaskManager:
             task.session.initialize_react_memory(task.task_description)
             context_builder = ReActContextBuilder(
                 task.session.react_memory,
-                max_context_iterations=5
+                max_context_iterations=3
             )
 
             # 使用会话的模型和RAG设置

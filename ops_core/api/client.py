@@ -113,11 +113,11 @@ class LLMAPIClient:
                                     - In Windows, copy and paste actions are better to be performed with right-click context menu. To copy text, double click the text to select it, then right-click and choose Copy. To paste text, right-click in the desired location and choose Paste.
                                     - Prefer using mouse actions over keyboard actions, unless there is a specific reason to use keyboard actions.
                                     - To scroll up or down, use <action>Keyboard</action> with <key>PgUp</key> or <key>PgDn</key> key.
-                                    - During Windows OS installation, when the screen displays something like 'Getting ready' or '准备就绪', it doesn't really mean the installation is done, 
-                                      but it means the rest of installation process is ready to continue. In this case, you should wait for the installation process to continue, 
-                                      until desktop is reached. The only criteria of installation completion is desktop being visible.
-                                      When you are required to select the drive/partition to install Windows, format the drive/partition before installation.
-                                    - When the screen displays something like 'press any key to boot from USB', ignore it and continue with your task.
+                                    - Windows OS installation:
+                                      * Windows OS installation has 2 stages: 1) file installation and 2) system (including account) configuration. The only indicator of installation completion is desktop being reached.
+                                      * To install Windows OS, you need to complete both file installation and system configuration, and finally reach desktop.
+                                      * Before installation, when you are required to select the drive/partition to install Windows, format the drive/partition before installation even if its capacity is sufficient.
+                                      * When the screen displays something like 'press any key to boot from USB', don't press any key, just wait for the computer to boot normally, then continue with Windows installation.
                         """
                     })
             else:
@@ -129,7 +129,12 @@ class LLMAPIClient:
             payload = {
                 "messages": messages,
                 "max_tokens": 6000,
-                "model": self.model
+                "model": self.model,
+                # "temperature": 0.7,
+                # "top_p": 0.95,
+                # "top_k": 20,
+                # "presence_penalty": 0.0,
+                # "repetition_penalty": 1.0,
             }
 
             # 发送POST请求
