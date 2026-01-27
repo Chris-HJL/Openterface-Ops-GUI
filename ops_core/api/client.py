@@ -113,9 +113,8 @@ class LLMAPIClient:
                                     - In Windows, copy and paste actions are better to be performed with right-click context menu. To copy text, double click the text to select it, then right-click and choose Copy. To paste text, right-click in the desired location and choose Paste.
                                     - Prefer using mouse actions over keyboard actions, unless there is a specific reason to use keyboard actions.
                                     - To scroll up or down, use <action>Keyboard</action> with <key>PgUp</key> or <key>PgDn</key> key.
+                                    - Make sure dropdown displays the desired item before proceeding with next action.
                                     - Windows OS installation:
-                                      * Windows OS installation has 2 stages: 1) file installation and 2) system (including account) configuration. The only indicator of installation completion is desktop being reached.
-                                      * To install Windows OS, you need to complete both file installation and system configuration, and finally reach desktop.
                                       * Before installation, when you are required to select the drive/partition to install Windows, format the drive/partition before installation even if its capacity is sufficient.
                                       * When the screen displays something like 'press any key to boot from USB', don't press any key, just wait for the computer to boot normally, then continue with Windows installation.
                         """
@@ -128,9 +127,9 @@ class LLMAPIClient:
 
             payload = {
                 "messages": messages,
-                "max_tokens": 6000,
+                "max_tokens": 8000,
                 "model": self.model,
-                # "temperature": 0.7,
+                # "temperature": 1.0,
                 # "top_p": 0.95,
                 # "top_k": 20,
                 # "presence_penalty": 0.0,
