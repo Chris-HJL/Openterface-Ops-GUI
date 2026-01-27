@@ -52,7 +52,13 @@ class ResponseParser:
             元组 (x, y)，失败返回 (-1, -1)
         """
         try:
-            # 尝试从字符串中提取坐标，支持 [x, y] 和 (x, y) 两种格式
+            # 尝试从字符串中提取坐标，支持 [x, y]、(x, y) 和 [x1,y1,x2,y2] 三种格式
+            match = re.search(r'\[(\d+),\s*(\d+),\s*(\d+),\s*(\d+)\]', raw_string)
+            if match:
+                x1 = int(match.group(1))
+                y1 = int(match.group(2))
+                return (x1, y1)
+            
             match = re.search(r'\[(\d+),\s*(\d+)\]', raw_string)
             if not match:
                 match = re.search(r'\((\d+),\s*(\d+)\)', raw_string)
