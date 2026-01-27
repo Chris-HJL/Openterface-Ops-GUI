@@ -18,7 +18,7 @@ from typing import Dict, Any
 from flask import Flask, request, jsonify
 
 # UI-Model global variables
-UI_MODEL_PATH = "D:\\AI\\models\\Fara-7B"
+UI_MODEL_PATH = "D:\\AI\\models\\GUI-Owl-7B"
 # UI_MODEL_PATH = "D:\\AI\\models\\UI-Ins-7B"
 ui_model = None
 ui_processor = None
@@ -30,13 +30,13 @@ app = Flask(__name__)
 def parse_coordinates(raw_string: str) -> tuple[int, int]:
     """
     Parse coordinates from model response, supports multiple formats:
-    - Single coordinate: [x,y]
-    - Two coordinates: [x1,y1,x2,y2]
-    - More coordinates: [x1,y1,x2,y2,x3,y3,...]
+    - Single coordinate: [x,y] or (x,y)
+    - Two coordinates: [x1,y1,x2,y2] or (x1,y1,x2,y2)
+    - More coordinates: [x1,y1,x2,y2,x3,y3,...] or (x1,y1,x2,y2,x3,y3,...)
     When multiple coordinates are present, only the first coordinate is extracted
     """
-    # Match all sequences of numbers within square brackets
-    matches = re.findall(r'\[([^\]]+)\]', raw_string)
+    # Match all sequences of numbers within square brackets or parentheses
+    matches = re.findall(r'[\[\(]([^\]\)]+)[\]\)]', raw_string)
     
     for match in matches:
         # Split numbers and convert to integers
