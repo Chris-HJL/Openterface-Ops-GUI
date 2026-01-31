@@ -1,5 +1,5 @@
 """
-API客户端模块
+API client module
 """
 from .connection import APIConnectionTester
 from .client import LLMAPIClient

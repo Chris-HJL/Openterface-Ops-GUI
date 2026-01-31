@@ -1,5 +1,5 @@
 """
-文档读取器模块
+Document reader module
 """
 import re
 import quopri
@@ -9,26 +9,26 @@ from llama_index.core.schema import Document
 from typing import Dict, Any
 
 class MHTMLReader(BaseReader):
-    """自定义MHTML文件读取器"""
+    """Custom MHTML file reader"""
 
     def load_data(self, file_path: str, extra_info: dict = None) -> list[Document]:
         """
-        加载MHTML文件并提取可见内容
+        Load MHTML file and extract visible content
 
         Args:
-            file_path: MHTML文件路径
-            extra_info: 额外信息
+            file_path: MHTML file path
+            extra_info: Extra information
 
         Returns:
-            文档列表
+            List of documents
         """
         with open(file_path, 'rb') as f:
             mhtml_content = f.read()
 
-        # 解码为字符串
+        # Decode to string
         mhtml_content = mhtml_content.decode('utf-8', errors='ignore')
 
-        # 查找HTML部分
+        # Find HTML section
         boundary_match = re.search(r'boundary="([^"]+)"', mhtml_content)
         if not boundary_match:
             return [Document(text="", extra_info=extra_info or {})]
@@ -52,11 +52,11 @@ class MHTMLReader(BaseReader):
         if not html_content:
             return [Document(text="", extra_info=extra_info or {})]
 
-        # 解码quoted-printable编码
+        # Decode quoted-printable encoding
         html_content = quopri.decodestring(html_content).decode('utf-8', errors='ignore')
         html_content = html_content.replace('\r\n', '\n')
 
-        # 提取可见内容
+        # Extract visible content
         soup = BeautifulSoup(html_content, 'lxml')
         for script in soup(['script', 'style', 'noscript', 'meta', 'link', 'head']):
             script.extract()

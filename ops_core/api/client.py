@@ -1,5 +1,5 @@
 """
-API客户端模块
+API client module
 """
 import requests
 import os
@@ -8,7 +8,7 @@ from config import Config
 from ..image.encoder import ImageEncoder
 
 class LLMAPIClient:
-    """LLM API客户端类"""
+    """LLM API client class"""
 
     def __init__(
         self,
@@ -17,12 +17,12 @@ class LLMAPIClient:
         api_key: Optional[str] = None
     ):
         """
-        初始化API客户端
+        Initialize API client
 
         Args:
             api_url: API URL
-            model: 模型名称
-            api_key: API密钥
+            model: Model name
+            api_key: API key
         """
         self.api_url = api_url or Config.DEFAULT_API_URL
         self.model = model or Config.DEFAULT_MODEL
@@ -38,35 +38,35 @@ class LLMAPIClient:
         system_prompt: Optional[str] = None
     ) -> str:
         """
-        获取API响应
+        Get API response
 
         Args:
-            prompt: 用户提示
-            image_path: 图像文件路径
-            history: 对话历史
-            retrieved_docs: 检索到的文档
-            system_prompt: 系统提示
+            prompt: User prompt
+            image_path: Image file path
+            history: Conversation history
+            retrieved_docs: Retrieved documents
+            system_prompt: System prompt
 
         Returns:
-            API响应文本
+            API response text
         """
         try:
-            # 如果有检索到的文档，添加到提示中
+            # If there are retrieved documents, add to prompt
             enhanced_prompt = prompt
             if retrieved_docs and len(retrieved_docs) > 0:
                 retrieved_content = "\n".join([f"[Relevant Document {i+1}]: {doc}" for i, doc in enumerate(retrieved_docs)])
                 enhanced_prompt = f"Answer the user's question based on the following relevant documents:\n{retrieved_content}\n\nUser question: {prompt}"
 
-            # 构建请求体
+            # Build request body
             messages = []
 
-            # 如果有对话历史，添加历史
+            # If there is conversation history, add history
             if history is not None and len(history) > 0:
                 messages.extend(history)
 
-            # 添加当前用户消息
+            # Add current user message
             if image_path and os.path.exists(image_path):
-                # 添加图像内容到消息
+                # Add image content to message
                 messages.append({
                     "role": "user",
                     "content": [
@@ -74,7 +74,7 @@ class LLMAPIClient:
                         {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{ImageEncoder.encode_to_base64(image_path)}"}}
                     ]
                 })
-                # 添加系统提示
+                # Add system prompt
                 if system_prompt:
                     messages.append({
                         "role": "system",
@@ -136,7 +136,7 @@ class LLMAPIClient:
                 # "repetition_penalty": 1.0,
             }
 
-            # 发送POST请求
+            # Send POST request
             response = requests.post(
                 self.api_url,
                 json=payload,
@@ -147,10 +147,10 @@ class LLMAPIClient:
                 timeout=self.timeout
             )
 
-            # 检查响应状态
+            # Check response status
             if response.status_code == 200:
                 data = response.json()
-                # 提取响应内容
+                # Extract response content
                 if "choices" in data and len(data["choices"]) > 0:
                     choice = data["choices"][0]
                     if "text" in choice:

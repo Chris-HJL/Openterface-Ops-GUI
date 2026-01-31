@@ -1,5 +1,5 @@
 """
-Pydantic模型定义
+Pydantic model definitions
 """
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel

@@ -1,5 +1,5 @@
 """
-RAG功能模块
+RAG functionality module
 """
 from .index_builder import IndexBuilder
 from .index_loader import IndexLoader

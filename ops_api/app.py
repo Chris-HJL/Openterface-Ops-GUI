@@ -1,5 +1,5 @@
 """
-FastAPI应用配置
+FastAPI application configuration
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,27 +8,27 @@ from .endpoints import router
 
 def create_app() -> FastAPI:
     """
-    创建FastAPI应用
+    Create FastAPI application
 
     Returns:
-        FastAPI应用实例
+        FastAPI application instance
     """
-    # 创建FastAPI应用
+    # Create FastAPI application
     app = FastAPI(title="Openterface Ops API", version="2.0.0")
 
-    # 配置CORS
+    # Configure CORS
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # 开发环境允许所有来源
+        allow_origins=["*"],  # Allow all origins in development
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
 
-    # 挂载静态文件
+    # Mount static files
     app.mount("/static", StaticFiles(directory=".", html=True), name="static")
 
-    # 注册路由
+    # Register routes
     app.include_router(router)
 
     return app

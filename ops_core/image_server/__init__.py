@@ -1,5 +1,5 @@
 """
-图像服务器客户端模块
+Image server client module
 """
 from .client import ImageServerClient
 

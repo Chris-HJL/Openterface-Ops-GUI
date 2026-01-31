@@ -12,15 +12,15 @@ import threading
 from ops_api import create_app
 
 if __name__ == "__main__":
-    # 启动后自动打开浏览器
+    # Automatically open browser after startup
     def open_browser():
         time.sleep(1)
         webbrowser.open("http://localhost:9000/static/index.html")
 
-    # 在新线程中打开浏览器
+    # Open browser in a new thread
     threading.Thread(target=open_browser).start()
 
-    # 运行服务器（使用导入字符串以支持热重载）
+    # Run server (use import string to support hot reload)
     uvicorn.run(
         "ops_api:create_app",
         host="0.0.0.0",

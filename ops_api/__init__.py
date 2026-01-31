@@ -1,6 +1,4 @@
-"""
-API服务器模块
-"""
+"""API Server Module"""
 from .models import *
 from .session import Session
 from .app import create_app

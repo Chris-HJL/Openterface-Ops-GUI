@@ -1,5 +1,5 @@
 """
-索引构建模块
+Index building module
 """
 from llama_index.core import VectorStoreIndex, Settings
 from llama_index.core.readers.base import BaseReader
@@ -9,22 +9,22 @@ from .readers import MHTMLReader
 from config import Config
 
 class IndexBuilder:
-    """索引构建器类"""
+    """Index builder class"""
 
     def __init__(self, api_base: Optional[str] = None, embed_model: Optional[str] = None):
         """
-        初始化索引构建器
+        Initialize index builder
 
         Args:
-            api_base: API基础URL
-            embed_model: 嵌入模型名称
+            api_base: API base URL
+            embed_model: Embedding model name
         """
         self.api_base = api_base or Config.RAG_API_BASE
         self.embed_model = embed_model or Config.RAG_EMBED_MODEL
         self._setup_llamaindex()
 
     def _setup_llamaindex(self):
-        """配置LlamaIndex环境"""
+        """Configure LlamaIndex environment"""
         Settings.embed_model = OpenAIEmbedding(
             model_name=self.embed_model,
             api_base=self.api_base,
@@ -37,38 +37,38 @@ class IndexBuilder:
         file_extractor: Optional[Dict[str, BaseReader]] = None
     ) -> bool:
         """
-        从文档目录构建索引
+        Build index from document directory
 
         Args:
-            docs_dir: 文档目录
-            index_dir: 索引保存目录
-            file_extractor: 文件提取器映射
+            docs_dir: Documents directory
+            index_dir: Index storage directory
+            file_extractor: File extractor mapping
 
         Returns:
-            是否成功
+            Whether successful
         """
         try:
             from llama_index.core import SimpleDirectoryReader
 
-            # 配置文件提取器
+            # Config file extractor
             if file_extractor is None:
                 file_extractor = {
                     ".mhtml": MHTMLReader()
                 }
 
-            # 读取文档
+            # Read documents
             documents = SimpleDirectoryReader(
                 docs_dir,
                 file_extractor=file_extractor
             ).load_data()
 
-            # 构建索引
+            # Build index
             index = VectorStoreIndex.from_documents(
                 documents,
                 show_progress=True,
             )
 
-            # 保存索引
+            # Save index
             index.storage_context.persist(persist_dir=index_dir)
 
             return True

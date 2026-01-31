@@ -1,5 +1,5 @@
 """
-全局配置管理
+Global configuration management
 """
 import os
 from typing import Optional
@@ -32,10 +32,10 @@ class Config:
 
     @classmethod
     def get_env(cls, key: str, default: Optional[str] = None) -> Optional[str]:
-        """获取环境变量"""
+        """Get environment variable"""
         return os.getenv(key, default)
 
     @classmethod
     def get_api_key(cls) -> str:
-        """获取API密钥"""
+        """Get API key"""
         return cls.get_env("LLM_API_KEY", "EMPTY")

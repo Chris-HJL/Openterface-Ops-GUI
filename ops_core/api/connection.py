@@ -1,26 +1,26 @@
 """
-API连接测试模块
+API connection test module
 """
 import requests
 from typing import Optional
 
 class APIConnectionTester:
-    """API连接测试器类"""
+    """API connection tester class"""
 
     @staticmethod
     def test_connection(api_url: str, timeout: int = 5) -> bool:
         """
-        测试API连接
+        Test API connection
 
         Args:
             api_url: API URL
-            timeout: 超时时间（秒）
+            timeout: Timeout in seconds
 
         Returns:
-            是否连接成功
+            Whether connection was successful
         """
         try:
-            # 尝试获取模型列表
+            # Try to get model list
             models_endpoint = api_url.replace("/chat/completions", "/models")
             test_response = requests.get(models_endpoint, timeout=timeout)
             return test_response.status_code == 200

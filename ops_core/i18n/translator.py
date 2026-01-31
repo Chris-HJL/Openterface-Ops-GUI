@@ -1,25 +1,25 @@
 """
-翻译功能模块
+Translation module
 """
 import json
 import os
 from typing import Dict, Any, Optional
 
 class Translator:
-    """翻译器类"""
+    """Translator class"""
 
     def __init__(self, lang_code: str = "en"):
         self.current_language = lang_code
         self.translations = self._load_translations(lang_code)
 
     def _load_translations(self, lang_code: str) -> Dict[str, Any]:
-        """加载翻译文件"""
+        """Load translation file"""
         try:
             lang_file = os.path.join("i18n", f"{lang_code}.json")
             with open(lang_file, "r", encoding="utf-8") as f:
                 return json.load(f)
         except FileNotFoundError:
-            # 回退到默认语言
+            # Fallback to default language
             default_file = os.path.join("i18n", "en.json")
             with open(default_file, "r", encoding="utf-8") as f:
                 return json.load(f)
@@ -29,14 +29,14 @@ class Translator:
 
     def translate(self, key: str, **kwargs) -> str:
         """
-        翻译函数支持格式化字符串
+        Translate function supports formatted strings
 
         Args:
-            key: 翻译键，支持嵌套如 "messages.connecting"
-            **kwargs: 格式化参数
+            key: Translation key, supports nested like "messages.connecting"
+            **kwargs: Formatting parameters
 
         Returns:
-            翻译后的字符串
+            Translated string
         """
         keys = key.split(".")
         value = self.translations
@@ -53,13 +53,13 @@ class Translator:
 
     def switch_language(self, lang_code: str) -> bool:
         """
-        切换语言
+        Switch language
 
         Args:
-            lang_code: 语言代码（en/zh）
+            lang_code: Language code (en/zh)
 
         Returns:
-            是否切换成功
+            Whether switch was successful
         """
         if lang_code in ["zh", "en"]:
             new_translations = self._load_translations(lang_code)
@@ -70,5 +70,5 @@ class Translator:
         return False
 
     def get_current_language(self) -> str:
-        """获取当前语言"""
+        """Get current language"""
         return self.current_language

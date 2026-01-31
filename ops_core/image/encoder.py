@@ -1,22 +1,22 @@
 """
-图像编码模块
+Image encoding module
 """
 import base64
 from typing import Optional
 
 class ImageEncoder:
-    """图像编码器类"""
+    """Image encoder class"""
 
     @staticmethod
     def encode_to_base64(image_path: str) -> str:
         """
-        将图像文件编码为Base64字符串
+        Encode image file to Base64 string
 
         Args:
-            image_path: 图像文件路径
+            image_path: Image file path
 
         Returns:
-            Base64编码的字符串
+            Base64 encoded string
         """
         try:
             with open(image_path, "rb") as image_file:
@@ -27,14 +27,14 @@ class ImageEncoder:
     @staticmethod
     def decode_from_base64(base64_str: str, output_path: str) -> bool:
         """
-        将Base64字符串解码并保存为图像文件
+        Decode Base64 string and save as image file
 
         Args:
-            base64_str: Base64编码的字符串
-            output_path: 输出文件路径
+            base64_str: Base64 encoded string
+            output_path: Output file path
 
         Returns:
-            是否成功
+            Whether successful
         """
         try:
             with open(output_path, "wb") as f:

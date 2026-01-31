@@ -1,19 +1,19 @@
 """
-文档检索模块
+Document retrieval module
 """
 from typing import List, Optional
 from llama_index.core import VectorStoreIndex
 from .index_loader import IndexLoader
 
 class DocumentRetriever:
-    """文档检索器类"""
+    """Document retriever class"""
 
     def __init__(self, index_dir: Optional[str] = None):
         """
-        初始化文档检索器
+        Initialize document retriever
 
         Args:
-            index_dir: 索引目录
+            index_dir: Index directory
         """
         self.index_dir = index_dir
         self.index: Optional[VectorStoreIndex] = None
@@ -21,7 +21,7 @@ class DocumentRetriever:
         self.top_k = 3
 
     def _load_index_if_needed(self):
-        """如果需要，加载索引"""
+        """Load index if needed"""
         if self.index is None and self.index_dir:
             loader = IndexLoader()
             self.index = loader.load_index(self.index_dir)
@@ -29,14 +29,14 @@ class DocumentRetriever:
 
     def retrieve(self, query: str, top_k: Optional[int] = None) -> List[str]:
         """
-        根据查询检索相关文档
+        Retrieve relevant documents based on query
 
         Args:
-            query: 查询文本
-            top_k: 返回的文档数量
+            query: Query text
+            top_k: Number of documents to return
 
         Returns:
-            检索到的文档内容列表
+            List of retrieved document content
         """
         if top_k:
             self.top_k = top_k

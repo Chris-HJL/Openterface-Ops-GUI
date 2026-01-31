@@ -1,5 +1,5 @@
 """
-API端点实现
+API endpoints implementation
 """
 import os
 import base64
@@ -40,43 +40,43 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# 全局会话字典
+# Global session dictionary
 sessions: Dict[str, Session] = {}
 
-# 创建FastAPI应用
+# Create FastAPI application
 from fastapi import APIRouter
 router = APIRouter()
 
-# 辅助函数
+# Helper functions
 def save_base64_image(base64_str: str) -> str:
-    """保存base64编码的图像到文件"""
-    # 创建images目录
+    """Save base64 encoded image to file"""
+    # Create images directory
     os.makedirs(Config.IMAGES_DIR, exist_ok=True)
 
-    # 生成文件名
+    # Generate filename
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"api_image_{timestamp}_{uuid.uuid4().hex[:8]}.jpg"
     filepath = os.path.join(Config.IMAGES_DIR, filename)
 
-    # 解码并保存
+    # Decode and save
     with open(filepath, "wb") as f:
         f.write(base64.b64decode(base64_str))
 
     return filepath
 
 def image_to_base64(filepath: str) -> str:
-    """将图像文件转换为base64字符串"""
+    """Convert image file to base64 string"""
     with open(filepath, "rb") as f:
         return base64.b64encode(f.read()).decode("utf-8")
 
-# API端点
+# API endpoints
 @router.post("/create-session", response_model=SessionResponse)
 async def create_session(request: CreateSessionRequest):
-    """创建新会话"""
+    """Create new session"""
     session_id = str(uuid.uuid4())
     session = Session(session_id)
 
-    # 应用自定义设置
+    # Apply custom settings
     if request.language:
         session.switch_language(request.language)
     if request.api_url:
@@ -97,29 +97,29 @@ async def create_session(request: CreateSessionRequest):
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
-    """处理聊天请求"""
+    """Process chat request"""
     logger.info(f"[Chat Request] Session: {request.session_id}, Prompt: {request.prompt[:100]}...")
-    
-    # 获取会话
+
+    # Get session
     if request.session_id not in sessions:
         logger.error(f"[Chat] Session not found: {request.session_id}")
         raise HTTPException(status_code=404, detail="Session not found")
     session = sessions[request.session_id]
 
-    # 使用会话或请求的模型
+    # Use session or requested model
     model = request.model or session.model
     rag_enabled = request.rag_enabled if request.rag_enabled is not None else session.rag_enabled
 
     logger.info(f"[Chat] Model: {model}, RAG enabled: {rag_enabled}, Multiturn mode: {session.is_multiturn_mode}")
 
-    # 获取图像路径
+    # Get image path
     image_path = None
 
-    # 首先检查会话中是否有保存的图像
+    # First check if session has saved image
     if session.current_image_path:
         image_path = session.current_image_path
         logger.info(f"[Chat] Using session image: {image_path}")
-    # 然后检查是否请求从服务器获取图像
+    # Then check if request to get image from server
     elif request.get_image_from_server:
         logger.info("[Chat] Fetching image from server...")
         image_server_client = ImageServerClient()
@@ -132,21 +132,21 @@ async def chat(request: ChatRequest):
                 success=False
             )
         logger.info(f"[Chat] Got image from server: {image_path}")
-    # 最后检查请求中是否提供了图像
+    # Finally check if image provided in request
     elif request.image:
-        # 保存base64图像到文件
+        # Save base64 image to file
         logger.info("[Chat] Saving base64 image to file...")
         image_path = save_base64_image(request.image)
         logger.info(f"[Chat] Saved image to: {image_path}")
 
-    # 如果启用RAG，检索相关文档
+    # If RAG enabled, retrieve relevant documents
     retrieved_docs = []
     if rag_enabled and session.retriever:
         logger.info("[Chat] Retrieving relevant documents...")
         retrieved_docs = session.retriever.retrieve(request.prompt)
         logger.info(f"[Chat] Retrieved {len(retrieved_docs)} documents")
 
-    # 获取API响应
+    # Get API response
     logger.info(f"[Chat] Calling LLM API at {session.api_url}...")
     api_client = LLMAPIClient(session.api_url, model)
     if session.is_multiturn_mode:
@@ -165,10 +165,10 @@ async def chat(request: ChatRequest):
     
     logger.info(f"[Chat] LLM Response: {response[:200]}...")
 
-    # 更新对话历史（如果是多轮模式）
+    # Update conversation history (if multiturn mode)
     updated_history = session.conversation_history.copy()
     if session.is_multiturn_mode and response:
-        # 添加用户消息
+            # Add user message
         user_msg = {"role": "user", "content": request.prompt}
         if image_path:
             user_msg["content"] = [
@@ -176,11 +176,11 @@ async def chat(request: ChatRequest):
                 {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_to_base64(image_path)}"}}
             ]
         updated_history.append(user_msg)
-        # 添加AI响应
+        # Add AI response
         updated_history.append({"role": "assistant", "content": response})
         session.conversation_history = updated_history
 
-    # 检查UI-Model请求
+    # Check UI-Model request
     processed_image = None
     parser = ResponseParser()
     action, element, input_content, key_content = parser.extract_action_and_element(response)
@@ -188,7 +188,7 @@ async def chat(request: ChatRequest):
     logger.info(f"[Chat] Parsed action: {action}, element: {element}, input: {input_content}, key: {key_content}")
 
     if action in ["Click", "Double Click", "Right Click"] and element and image_path:
-        # 处理UI-Model
+        # Process UI-Model
         logger.info(f"[Chat] Processing UI-Model request: {action} on {element}")
         try:
             executor = CommandExecutor(session.ui_model_api_url, session.ui_model)
@@ -200,7 +200,7 @@ async def chat(request: ChatRequest):
             if success:
                 logger.info(f"[Chat] UI-Model success: {result}")
                 if isinstance(result, str) and os.path.exists(result):
-                    # 转换为base64
+                    # Convert to base64
                     processed_image = image_to_base64(result)
                     logger.info(f"[Chat] Processed image generated: {result}")
             else:
@@ -209,21 +209,21 @@ async def chat(request: ChatRequest):
         except Exception as e:
             logger.error(f"[Chat] UI-Model processing error: {str(e)}", exc_info=True)
     elif action == "Input" and input_content:
-        # 处理Input动作 - 直接发送文本
+        # Process Input action - send text directly
         logger.info(f"[Chat] Sending input: {input_content}")
         image_server_client = ImageServerClient()
         script_command = f'Send "{input_content}"'
         image_server_client.send_script_command(script_command)
         logger.info(f"[Chat] Input sent successfully")
     elif action == "Keyboard" and key_content:
-        # 处理Keyboard动作 - 发送按键命令
+        # Process Keyboard action - send key command
         logger.info(f"[Chat] Sending keyboard key: {key_content}")
         image_server_client = ImageServerClient()
         script_command = f'Send "{{{key_content}}}"'
         image_server_client.send_script_command(script_command)
         logger.info(f"[Chat] Keyboard command sent successfully")
 
-    # 处理完成后清除当前图像路径
+    # Clear current image path after processing
     session.current_image_path = None
 
     return ChatResponse(
@@ -235,13 +235,13 @@ async def chat(request: ChatRequest):
 
 @router.post("/build-index", response_model=IndexResponse)
 async def build_index(request: BuildIndexRequest):
-    """从文档构建RAG索引"""
-    # 获取会话
+    """Build RAG index from documents"""
+    # Get session
     if request.session_id not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
     session = sessions[request.session_id]
 
-    # 构建索引
+    # Build index
     builder = IndexBuilder()
     success = builder.build_index(request.docs_dir, request.index_dir)
     if success:
@@ -257,26 +257,26 @@ async def build_index(request: BuildIndexRequest):
             success=False
         )
 
-# 新的异步任务端点
+# New async task endpoint
 @router.post("/react-task", response_model=CreateReactTaskResponse)
 async def create_react_task(request: CreateReactTaskRequest):
-    """创建并启动异步ReAct任务"""
+    """Create and start async ReAct task"""
     logger.info(f"[ReAct Task] Creating task for session {request.session_id}")
     logger.info(f"[ReAct Task] Task: {request.task}, Max iterations: {request.max_iterations}, Approval policy: {request.approval_policy}")
 
-    # 获取会话
+    # Get session
     if request.session_id not in sessions:
         logger.error(f"[ReAct Task] Session not found: {request.session_id}")
         raise HTTPException(status_code=404, detail="Session not found")
     session = sessions[request.session_id]
 
-    # 应用自定义设置
+    # Apply custom settings
     if request.model:
         session.model = request.model
     if request.rag_enabled is not None:
         session.rag_enabled = request.rag_enabled
 
-    # 创建任务
+    # Create task
     task_id = await task_manager.create_task(
         session_id=request.session_id,
         task_description=request.task,
@@ -285,7 +285,7 @@ async def create_react_task(request: CreateReactTaskRequest):
         approval_policy=request.approval_policy
     )
 
-    # 启动任务
+    # Start task
     await task_manager.start_task(task_id)
 
     logger.info(f"[ReAct Task] Task {task_id} created and started")
@@ -299,7 +299,7 @@ async def create_react_task(request: CreateReactTaskRequest):
 
 @router.get("/react-stream/{task_id}")
 async def react_stream(task_id: str):
-    """SSE流式推送任务进度"""
+    """SSE stream task progress"""
     from fastapi.responses import StreamingResponse
     import json
 
@@ -310,7 +310,7 @@ async def react_stream(task_id: str):
     async def event_generator():
         try:
             while True:
-                # 检查任务状态
+                # Check task status
                 if task.status == "completed":
                     logger.info(f"[ReAct Stream] Task completed, sending completed event")
                     data = {
@@ -348,7 +348,7 @@ async def react_stream(task_id: str):
                     yield f"data: {json.dumps(data)}\n\n"
                     break
 
-                # 从事件队列获取更新
+                # Get updates from event queue
                 try:
                     event = await asyncio.wait_for(task.event_queue.get(), timeout=0.5)
                     if event["type"] == "progress":
@@ -375,7 +375,7 @@ async def react_stream(task_id: str):
                         }
                         yield f"data: {json.dumps(data)}\n\n"
                 except asyncio.TimeoutError:
-                    # 超时继续循环
+                    # Timeout continue loop
                     continue
 
         except Exception as e:
@@ -401,7 +401,7 @@ async def react_stream(task_id: str):
 
 @router.get("/react-status/{task_id}", response_model=ReactTaskStatusResponse)
 async def get_react_status(task_id: str):
-    """获取任务状态"""
+    """Get task status"""
     task = task_manager.get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -425,7 +425,7 @@ async def get_react_status(task_id: str):
 
 @router.post("/stop-react-task")
 async def stop_react_task(request: StopReactTaskRequest):
-    """停止异步ReAct任务"""
+    """Stop async ReAct task"""
     logger.info(f"[ReAct Task] Stopping task {request.task_id}")
 
     task = task_manager.get_task(request.task_id)
@@ -442,7 +442,7 @@ async def stop_react_task(request: StopReactTaskRequest):
 
 @router.post("/approve-action/{task_id}", response_model=ApprovalResponse)
 async def approve_action(task_id: str, request: ApprovalRequest):
-    """批准操作"""
+    """Approve action"""
     logger.info(f"[ReAct Task] Approving action for task {task_id}")
 
     task = task_manager.get_task(task_id)
@@ -466,7 +466,7 @@ async def approve_action(task_id: str, request: ApprovalRequest):
 
 @router.post("/reject-action/{task_id}", response_model=ApprovalResponse)
 async def reject_action(task_id: str, request: RejectionRequest):
-    """拒绝操作"""
+    """Reject action"""
     logger.info(f"[ReAct Task] Rejecting action for task {task_id}: {request.reason}")
 
     task = task_manager.get_task(task_id)
@@ -490,7 +490,7 @@ async def reject_action(task_id: str, request: RejectionRequest):
 
 @router.post("/set-approval-policy/{task_id}")
 async def set_approval_policy(task_id: str, policy: str):
-    """设置审核策略"""
+    """Set approval policy"""
     logger.info(f"[ReAct Task] Setting approval policy for task {task_id} to {policy}")
 
     task = task_manager.get_task(task_id)
@@ -510,7 +510,7 @@ async def set_approval_policy(task_id: str, policy: str):
 
 @router.get("/approval-history/{task_id}", response_model=ApprovalHistoryResponse)
 async def get_approval_history(task_id: str):
-    """获取审核历史"""
+    """Get approval history"""
     logger.info(f"[ReAct Task] Getting approval history for task {task_id}")
 
     task = task_manager.get_task(task_id)
@@ -526,13 +526,13 @@ async def get_approval_history(task_id: str):
 
 @router.get("/status/{session_id}", response_model=StatusResponse)
 async def get_status(session_id: str):
-    """获取API状态"""
-    # 获取会话
+    """Get API status"""
+    # Get session
     if session_id not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
     session = sessions[session_id]
 
-    # 检查API连接
+    # Check API connection
     tester = APIConnectionTester()
     api_status = "Available" if tester.test_connection(session.api_url) else "Unavailable"
     ui_model_status = "Available" if tester.test_connection(session.ui_model_api_url) else "Unavailable"
@@ -545,13 +545,13 @@ async def get_status(session_id: str):
 
 @router.post("/switch-lang", response_model=LangResponse)
 async def switch_language_api(request: SwitchLangRequest):
-    """切换语言"""
-    # 获取会话
+    """Switch language"""
+    # Get session
     if request.session_id not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
     session = sessions[request.session_id]
 
-    # 切换语言
+    # Switch language
     if request.lang_code in ["en", "zh"]:
         if session.switch_language(request.lang_code):
             return LangResponse(
@@ -567,13 +567,13 @@ async def switch_language_api(request: SwitchLangRequest):
 
 @router.post("/toggle-rag", response_model=ToggleResponse)
 async def toggle_rag(request: ToggleRequest):
-    """切换RAG功能"""
-    # 获取会话
+    """Toggle RAG functionality"""
+    # Get session
     if request.session_id not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
     session = sessions[request.session_id]
 
-    # 切换RAG
+    # Toggle RAG
     session.rag_enabled = not session.rag_enabled
     return ToggleResponse(
         message="RAG functionality toggled",
@@ -583,19 +583,19 @@ async def toggle_rag(request: ToggleRequest):
 
 @router.post("/toggle-multiturn", response_model=ToggleResponse)
 async def toggle_multiturn(request: ToggleRequest):
-    """切换多轮对话模式"""
-    # 获取会话
+    """Toggle multiturn mode"""
+    # Get session
     if request.session_id not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
     session = sessions[request.session_id]
 
-    # 如果提供了模式则设置，否则切换
+    # If mode provided then set, otherwise toggle
     if request.mode is not None:
         session.is_multiturn_mode = request.mode
     else:
         session.is_multiturn_mode = not session.is_multiturn_mode
 
-    # 如果切换到单轮模式，清除历史
+    # If switching to single turn mode, clear history
     if not session.is_multiturn_mode:
         session.clear_history()
 
@@ -607,13 +607,13 @@ async def toggle_multiturn(request: ToggleRequest):
 
 @router.post("/clear-history", response_model=SessionResponse)
 async def clear_history(request: ClearHistoryRequest):
-    """清除对话历史"""
-    # 获取会话
+    """Clear conversation history"""
+    # Get session
     if request.session_id not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
     session = sessions[request.session_id]
 
-    # 清除历史
+    # Clear history
     session.clear_history()
     return SessionResponse(
         session_id=request.session_id,
@@ -623,13 +623,13 @@ async def clear_history(request: ClearHistoryRequest):
 
 @router.post("/get-image", response_model=GetImageResponse)
 async def get_image(request: GetImageRequest):
-    """从服务器获取最新图像"""
-    # 获取会话
+    """Get latest image from server"""
+    # Get session
     if request.session_id not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
     session = sessions[request.session_id]
 
-    # 从服务器获取图像
+    # Get image from server
     image_server_client = ImageServerClient()
     image_path = image_server_client.get_last_image()
     if image_path and not image_path.startswith("./images"):
@@ -639,10 +639,10 @@ async def get_image(request: GetImageRequest):
             success=False
         )
 
-    # 保存图像路径到会话
+    # Save image path to session
     session.current_image_path = image_path
 
-    # 转换图像为base64
+    # Convert image to base64
     try:
         image_base64 = image_to_base64(image_path)
         return GetImageResponse(
@@ -659,17 +659,17 @@ async def get_image(request: GetImageRequest):
 
 @router.post("/react", response_model=ReactResponse)
 async def react(request: ReactRequest):
-    """启动ReAct agent模式自主完成任务"""
+    """Start ReAct agent mode to complete task independently"""
     logger.info(f"[ReAct] Starting ReAct agent for session {request.session_id}")
     logger.info(f"[ReAct] Task: {request.task}, Max iterations: {request.max_iterations}")
     
-    # 获取会话
+    # Get session
     if request.session_id not in sessions:
         logger.error(f"[ReAct] Session not found: {request.session_id}")
         raise HTTPException(status_code=404, detail="Session not found")
     session = sessions[request.session_id]
 
-    # 检查是否已在运行
+    # Check if already running
     if session.react_is_running:
         logger.warning(f"[ReAct] Agent already running for session {request.session_id}")
         return ReactResponse(
@@ -679,24 +679,24 @@ async def react(request: ReactRequest):
             success=False
         )
 
-    # 初始化ReAct模式
+    # Initialize ReAct mode
     session.react_enabled = True
     session.react_max_iterations = request.max_iterations
     session.react_current_iteration = 0
     session.react_task_description = request.task
     session.react_is_running = True
 
-    # 初始化记忆
+    # Initialize memory
     session.initialize_react_memory(request.task)
     context_builder = ReActContextBuilder(session.react_memory, max_context_iterations=5)
 
-    # 使用会话或请求的模型和RAG设置
+    # Use session or requested model and RAG settings
     model = request.model or session.model
     rag_enabled = request.rag_enabled if request.rag_enabled is not None else session.rag_enabled
 
     logger.info(f"[ReAct] Model: {model}, RAG enabled: {rag_enabled}")
 
-    # 存储每次迭代的图像
+    # Store image for each iteration
     iteration_images = []
 
     try:
@@ -706,14 +706,14 @@ async def react(request: ReactRequest):
 
             logger.info(f"[ReAct Session {request.session_id}] Iteration {iteration_num}/{session.react_max_iterations}")
 
-            # 从服务器获取最新图像
+            # Fetch latest image from server
             logger.info(f"[ReAct] Fetching image from server for iteration {iteration_num}")
             image_server_client = ImageServerClient()
             image_path = image_server_client.get_last_image()
             if image_path and not image_path.startswith("./images"):
                 logger.error(f"[ReAct] Failed to get image from server: {image_path}")
                 
-                # 记录失败的迭代
+                # Log failed iteration
                 iteration_record = IterationRecord(
                     iteration_number=iteration_num,
                     timestamp=datetime.now().isoformat(),
@@ -735,13 +735,13 @@ async def react(request: ReactRequest):
                 )
             logger.info(f"[ReAct] Got image: {image_path}")
 
-            # 构建基础提示
+            # Build base prompt
             base_prompt = session.react_task_description
 
-            # 使用记忆构建增强提示
+            # Use memory to build enhanced prompt
             enhanced_prompt = context_builder.build_enhanced_prompt(base_prompt, iteration_num)
 
-            # 获取API响应
+            # Get API response
             logger.info(f"[ReAct] Calling LLM API to check task completion...")
             api_client = LLMAPIClient(session.api_url, model)
             response = api_client.get_response(
@@ -751,12 +751,12 @@ async def react(request: ReactRequest):
             )
             logger.info(f"[ReAct] LLM Response: {response[:200]}...")
 
-            # 解析响应
+            # Parse response
             parser = ResponseParser()
             action, element, input_content, key_content = parser.extract_action_and_element(response)
             logger.info(f"[ReAct] Parsed action: {action}, element: {element}, input: {input_content}, key: {key_content}")
 
-            # 提取 reasoning
+            # Extract reasoning
             reasoning_pattern = r'<reasoning>(.*?)</reasoning>'
             reasoning_matches = [m.strip() for m in __import__('re').findall(reasoning_pattern, response, __import__('re').DOTALL)]
             reasoning = reasoning_matches[0] if reasoning_matches else None
@@ -766,7 +766,7 @@ async def react(request: ReactRequest):
             task_status_matches = [m.strip() for m in __import__('re').findall(task_status_pattern, response, __import__('re').DOTALL)]
             task_status = task_status_matches[0] if task_status_matches else "in_progress"
             
-            # 记录迭代
+            # Record iteration
             iteration_record = IterationRecord(
                 iteration_number=iteration_num,
                 timestamp=datetime.now().isoformat(),
@@ -791,7 +791,7 @@ async def react(request: ReactRequest):
                 final_reasoning_matches = [m.strip() for m in __import__('re').findall(final_reasoning_pattern, response, __import__('re').DOTALL)]
                 final_reasoning = final_reasoning_matches[0] if final_reasoning_matches else None
                 
-                # 更新迭代记录
+                # Update iteration record
                 iteration_record.execution_success = True
                 session.react_memory_store.add_iteration(session.session_id, iteration_record)
                 session.react_memory_store.finalize_memory(session.session_id, "completed", final_reasoning)
@@ -809,7 +809,7 @@ async def react(request: ReactRequest):
                     images=iteration_images
                 )
 
-            # 处理UI操作
+            # Process UI actions
             logger.info(f"[ReAct] Processing UI action...")
             execution_success = False
             execution_result = None
@@ -846,19 +846,19 @@ async def react(request: ReactRequest):
                 execution_success = True
                 execution_result = "Keyboard command sent successfully"
 
-            # 更新迭代记录
+            # Update iteration record
             iteration_record.execution_success = execution_success
             iteration_record.execution_result = execution_result
             iteration_record.execution_error = execution_error
             session.react_memory_store.add_iteration(session.session_id, iteration_record)
             session.react_memory_store.update_patterns(session.session_id, iteration_record)
 
-            # 等待一段时间让系统响应
+            # Wait for system to respond
             import time
             logger.info(f"[ReAct] Waiting for system to respond...")
             time.sleep(3)
 
-        # 达到最大迭代次数
+        # Maximum iterations reached
         logger.warning(f"[ReAct] Maximum iterations reached: {session.react_max_iterations}")
         session.react_is_running = False
         session.react_memory_store.finalize_memory(session.session_id, "max_iterations")
@@ -884,13 +884,13 @@ async def react(request: ReactRequest):
 
 @router.post("/stop-react", response_model=ReactResponse)
 async def stop_react(request: StopReactRequest):
-    """停止ReAct agent"""
-    # 获取会话
+    """Stop ReAct agent"""
+    # Get session
     if request.session_id not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
     session = sessions[request.session_id]
 
-    # 停止ReAct
+    # Stop ReAct
     if session.react_is_running:
         session.react_is_running = False
         if session.react_memory:

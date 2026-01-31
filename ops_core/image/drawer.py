@@ -1,12 +1,12 @@
 """
-图像绘制模块
+Image drawing module
 """
 from PIL import Image, ImageDraw
 from typing import Tuple
 import os
 
 class ImageDrawer:
-    """图像绘制器类"""
+    """Image drawer class"""
 
     @staticmethod
     def draw_rectangle(
@@ -18,35 +18,35 @@ class ImageDrawer:
         width: int = 3
     ) -> bool:
         """
-        在图像上绘制矩形框
+        Draw rectangle on image
 
         Args:
-            image_path: 输入图像路径
-            top_left: 左上角坐标 (x, y)
-            bottom_right: 右下角坐标 (x, y)
-            output_path: 输出图像路径
-            color: 颜色
-            width: 线宽
+            image_path: Input image path
+            top_left: Top-left corner coordinates (x, y)
+            bottom_right: Bottom-right corner coordinates (x, y)
+            output_path: Output image path
+            color: Color
+            width: Line width
 
         Returns:
-            是否成功
+            Whether successful
         """
         try:
-            # 打开图像
+            # Open image
             image = Image.open(image_path)
             draw = ImageDraw.Draw(image)
 
-            # 绘制矩形
+            # Draw rectangle
             draw.rectangle(
                 [top_left, bottom_right],
                 outline=color,
                 width=width
             )
 
-            # 确保输出目录存在
+            # Ensure output directory exists
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
-            # 保存图像
+            # Save image
             image.save(output_path)
             return True
 

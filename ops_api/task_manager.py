@@ -1,6 +1,6 @@
 """
-ReAct任务管理器
-管理异步任务的创建、执行、停止和状态查询
+ReAct task manager
+Manages creation, execution, stopping, and status querying of async tasks
 """
 import asyncio
 import logging
@@ -23,14 +23,14 @@ logger = logging.getLogger(__name__)
 
 
 def image_to_base64(filepath: str) -> str:
-    """将图像文件转换为base64字符串"""
+    """Convert image file to base64 string"""
     with open(filepath, "rb") as f:
         import base64
         return base64.b64encode(f.read()).decode("utf-8")
 
 
 class ReActTask:
-    """ReAct任务类"""
+    """ReAct task class"""
 
     def __init__(self, task_id: str, session_id: str, task_description: str, max_iterations: int, session):
         self.task_id = task_id
@@ -39,14 +39,14 @@ class ReActTask:
         self.max_iterations = max_iterations
         self.session = session
 
-        # 状态
+        # Status
         self.status = "pending"  # pending, running, waiting_approval, completed, stopped, error, rejected
         self.current_iteration = 0
         self.final_status = None
         self.message = None
         self.error_message = None
 
-        # 最后一次执行信息
+        # Last execution information
         self.last_action = None
         self.last_element = None
         self.last_key_content = None
@@ -55,7 +55,7 @@ class ReActTask:
         self.last_image = None
         self.last_status = None
 
-        # 审核相关
+        # Approval related
         self.pending_approval = None
         self.approval_history = []
         self.approval_policy = "manual"  # auto, manual, strict
@@ -66,31 +66,31 @@ class ReActTask:
             "擦除", "清除", "重置", "销毁"
         ]
 
-        # 控制标志
+        # Control flags
         self.should_stop = False
         self.approval_result = None  # approved, rejected
 
-        # 时间戳
+        # Timestamps
         self.created_at = datetime.now()
         self.updated_at = datetime.now()
 
-        # 迭代图像
+        # Iteration images
         self.iteration_images = []
 
-        # 事件队列（用于SSE推送）
+        # Event queue (for SSE push)
         self.event_queue = asyncio.Queue()
 
-        # 审核事件（用于同步等待）
+        # Approval event (for synchronous waiting)
         self.approval_event = asyncio.Event()
 
     def update_progress(self, **kwargs):
-        """更新进度"""
+        """Update progress"""
         for key, value in kwargs.items():
             if hasattr(self, key):
                 setattr(self, key, value)
         self.updated_at = datetime.now()
 
-        # 将更新推送到事件队列
+            # Push update to event queue
         try:
             self.event_queue.put_nowait({
                 "type": "progress",
@@ -100,7 +100,7 @@ class ReActTask:
             pass
 
     def complete(self, final_status: str, message: str):
-        """完成任务"""
+        """Complete task"""
         self.status = "completed"
         self.final_status = final_status
         self.message = message
@@ -118,7 +118,7 @@ class ReActTask:
             pass
 
     def stop(self):
-        """停止任务"""
+        """Stop task"""
         self.status = "stopped"
         self.should_stop = True
         self.updated_at = datetime.now()
@@ -132,7 +132,7 @@ class ReActTask:
             pass
 
     def error(self, error_message: str):
-        """任务错误"""
+        """Task error"""
         self.status = "error"
         self.error_message = error_message
         self.updated_at = datetime.now()
@@ -146,7 +146,7 @@ class ReActTask:
             pass
 
     def request_approval(self, approval_data):
-        """请求审核"""
+        """Request approval"""
         self.status = "waiting_approval"
         self.pending_approval = approval_data
         self.updated_at = datetime.now()
@@ -162,7 +162,7 @@ class ReActTask:
         logger.info(f"[TaskManager] Approval requested for task {self.task_id}")
 
     def approve(self):
-        """批准操作"""
+        """Approve action"""
         self.status = "running"
         self.approval_result = "approved"
         self.pending_approval = None
@@ -183,7 +183,7 @@ class ReActTask:
         logger.info(f"[TaskManager] Action approved for task {self.task_id}")
 
     def reject(self, reason: str):
-        """拒绝操作"""
+        """Reject action"""
         self.status = "rejected"
         self.approval_result = "rejected"
         self.should_stop = True
@@ -205,7 +205,7 @@ class ReActTask:
         logger.info(f"[TaskManager] Action rejected for task {self.task_id}: {reason}")
 
     async def wait_for_approval(self, timeout: int = 300) -> str:
-        """等待审核结果"""
+        """Wait for approval result"""
         try:
             await asyncio.wait_for(self.approval_event.wait(), timeout=timeout)
             return self.approval_result
@@ -216,14 +216,14 @@ class ReActTask:
 
 
 class ReActTaskManager:
-    """ReAct任务管理器"""
+    """ReAct task manager"""
 
     def __init__(self):
         self.tasks: Dict[str, ReActTask] = {}
         self.lock = asyncio.Lock()
 
     async def create_task(self, session_id: str, task_description: str, max_iterations: int, session, approval_policy: str = "manual") -> str:
-        """创建新任务"""
+        """Create new task"""
         task_id = str(uuid.uuid4())
         task = ReActTask(
             task_id=task_id,
@@ -241,7 +241,7 @@ class ReActTaskManager:
         return task_id
 
     async def start_task(self, task_id: str):
-        """启动任务"""
+        """Start task"""
         task = self.tasks.get(task_id)
         if not task:
             logger.error(f"[TaskManager] Task {task_id} not found")
@@ -250,18 +250,18 @@ class ReActTaskManager:
         task.status = "running"
         logger.info(f"[TaskManager] Starting task {task_id}")
 
-        # 在后台执行任务
+        # Execute task in background
         asyncio.create_task(self._execute_task(task))
 
     async def stop_task(self, task_id: str):
-        """停止任务"""
+        """Stop task"""
         task = self.tasks.get(task_id)
         if task:
             task.stop()
             logger.info(f"[TaskManager] Stopping task {task_id}")
 
     async def approve_action(self, task_id: str):
-        """批准操作"""
+        """Approve action"""
         task = self.tasks.get(task_id)
         if task and task.status == "waiting_approval":
             task.approve()
@@ -269,7 +269,7 @@ class ReActTaskManager:
         return False
 
     async def reject_action(self, task_id: str, reason: str):
-        """拒绝操作"""
+        """Reject action"""
         task = self.tasks.get(task_id)
         if task and task.status == "waiting_approval":
             task.reject(reason)
@@ -277,18 +277,18 @@ class ReActTaskManager:
         return False
 
     def set_approval_policy(self, task_id: str, policy: str):
-        """设置审核策略"""
+        """Set approval policy"""
         task = self.tasks.get(task_id)
         if task:
             task.approval_policy = policy
             logger.info(f"[TaskManager] Set approval policy to {policy} for task {task_id}")
 
     def get_task(self, task_id: str) -> Optional[ReActTask]:
-        """获取任务"""
+        """Get task"""
         return self.tasks.get(task_id)
 
     def _is_dangerous_action(self, action: str, element: str, key_content: str, dangerous_keywords: List[str]) -> bool:
-        """判断是否为危险操作"""
+        """Check if dangerous action"""
         dangerous_action_types = [
             "delete", "format", "uninstall", "destroy",
             "删除", "格式化", "卸载", "销毁"
@@ -309,35 +309,35 @@ class ReActTaskManager:
         return False
 
     async def _execute_task(self, task: ReActTask):
-        """执行任务（异步）"""
+        """Execute task (async)"""
         try:
             logger.info(f"[TaskManager] Executing task {task.task_id}")
 
-            # 初始化ReAct记忆
+            # Initialize ReAct memory
             task.session.initialize_react_memory(task.task_description)
             context_builder = ReActContextBuilder(
                 task.session.react_memory,
                 max_context_iterations=3
             )
 
-            # 使用会话的模型和RAG设置
+            # Use session model and RAG settings
             model = task.session.model
             rag_enabled = task.session.rag_enabled
 
             logger.info(f"[TaskManager] Model: {model}, RAG enabled: {rag_enabled}")
 
-            # 执行迭代循环
+            # Execute iteration loop
             while not task.should_stop and task.current_iteration < task.max_iterations:
                 task.current_iteration += 1
                 iteration_num = task.current_iteration
 
                 logger.info(f"[TaskManager] Iteration {iteration_num}/{task.max_iterations}")
 
-                # 从服务器获取最新图像
+                # Fetch latest image from server
                 image_server_client = ImageServerClient()
                 image_path = image_server_client.get_last_image()
 
-                # 检查是否需要停止
+                # Check if need to stop
                 if task.should_stop:
                     logger.info(f"[TaskManager] Task stop requested after fetching image")
                     task.stop()
@@ -350,16 +350,16 @@ class ReActTaskManager:
 
                 logger.info(f"[TaskManager] Got image: {image_path}")
 
-                # 构建提示
+                # Build prompt
                 base_prompt = task.task_description
 
-                # 使用记忆构建增强提示
+                # Use memory to build enhanced prompt
                 enhanced_prompt = context_builder.build_enhanced_prompt(
                     base_prompt,
                     iteration_num
                 )
 
-                # 获取API响应
+                # Get API response
                 api_client = LLMAPIClient(task.session.api_url, model)
                 response = api_client.get_response(
                     enhanced_prompt,
@@ -370,25 +370,25 @@ class ReActTaskManager:
 
                 logger.info(f"[TaskManager] LLM Response: {response[:200]}...")
 
-                # 解析响应
+                # Parse response
                 parser = ResponseParser()
                 action, element, input_content, key_content = parser.extract_action_and_element(response)
 
-                # 提取 reasoning
+                # Extract reasoning
                 reasoning_pattern = r'<reasoning>(.*?)</reasoning>'
                 reasoning_matches = [m.strip() for m in re.findall(
                     reasoning_pattern, response, re.DOTALL
                 )]
                 reasoning = reasoning_matches[0] if reasoning_matches else None
 
-                # 检查任务状态
+                # Check task status
                 task_status_pattern = r'<task_status>(.*?)</task_status>'
                 task_status_matches = [m.strip() for m in re.findall(
                     task_status_pattern, response, re.DOTALL
                 )]
                 task_status = task_status_matches[0] if task_status_matches else "in_progress"
 
-                # 记录迭代
+                # Record iteration
                 iteration_record = IterationRecord(
                     iteration_number=iteration_num,
                     timestamp=datetime.now().isoformat(),
@@ -404,24 +404,24 @@ class ReActTaskManager:
                     task_status=task_status
                 )
 
-                # 检查是否需要停止
+                # Check if need to stop
                 if task.should_stop:
                     logger.info(f"[TaskManager] Task stop requested before executing action")
                     task.stop()
                     return
 
-                # 检查任务是否完成
+                # Check if task is completed
                 if task_status == "completed":
                     logger.info(f"[TaskManager] Task completed at iteration {iteration_num}")
 
-                    # 提取 final_reasoning
+                    # Extract final_reasoning
                     final_reasoning_pattern = r'<final_reasoning>(.*?)</final_reasoning>'
                     final_reasoning_matches = [m.strip() for m in re.findall(
                         final_reasoning_pattern, response, re.DOTALL
                     )]
                     final_reasoning = final_reasoning_matches[0] if final_reasoning_matches else None
 
-                    # 更新迭代记录
+                    # Update iteration record
                     iteration_record.execution_success = True
                     task.session.react_memory_store.add_iteration(task.session_id, iteration_record)
                     task.session.react_memory_store.finalize_memory(
@@ -430,7 +430,7 @@ class ReActTaskManager:
                         final_reasoning
                     )
 
-                    # 完成任务
+                    # Complete task
                     message = f"Task completed successfully in {iteration_num} iterations"
                     if final_reasoning:
                         message += f"\n<final_reasoning>{final_reasoning}</final_reasoning>"
@@ -438,7 +438,7 @@ class ReActTaskManager:
                     task.complete("completed", message)
                     return
 
-                # 保存最后一次执行信息
+                # Save last execution information
                 task.last_action = action
                 task.last_element = element
                 task.last_key_content = key_content
@@ -446,7 +446,7 @@ class ReActTaskManager:
                 task.last_task_status = task_status
                 task.last_image = image_path
 
-                # 危险操作检测和审核
+                # Danger action detection and approval
                 needs_approval = False
                 is_dangerous = False
 
@@ -460,7 +460,7 @@ class ReActTaskManager:
                 if needs_approval and action and action != "none":
                     logger.info(f"[TaskManager] Action requires approval: {action} on {element}")
 
-                    # 请求审核
+                    # Request approval
                     approval_data = {
                         "iteration": iteration_num,
                         "action": action,
@@ -472,7 +472,7 @@ class ReActTaskManager:
                     }
                     task.request_approval(approval_data)
 
-                    # 等待审核结果
+                    # Wait for approval result
                     approval_result = await task.wait_for_approval(timeout=300)
 
                     if approval_result == "rejected":
@@ -486,7 +486,7 @@ class ReActTaskManager:
                     elif approval_result == "approved":
                         logger.info(f"[TaskManager] Action approved, continuing execution")
 
-                # 处理UI操作
+                # Process UI actions
                 execution_success = False
                 execution_result = None
                 execution_error = None
@@ -524,14 +524,14 @@ class ReActTaskManager:
                     execution_success = True
                     execution_result = "Keyboard command sent successfully"
 
-                # 更新迭代记录
+                # Update iteration record
                 iteration_record.execution_success = execution_success
                 iteration_record.execution_result = execution_result
                 iteration_record.execution_error = execution_error
                 task.session.react_memory_store.add_iteration(task.session_id, iteration_record)
                 task.session.react_memory_store.update_patterns(task.session_id, iteration_record)
 
-                # 更新进度：显示操作结果
+                # Update progress: display operation result
                 task.update_progress(
                     iteration=iteration_num,
                     action=action,
@@ -541,16 +541,16 @@ class ReActTaskManager:
                     task_status=task_status
                 )
 
-                # 检查是否需要停止
+                # Check if need to stop
                 if task.should_stop:
                     logger.info(f"[TaskManager] Task stop requested before waiting")
                     task.stop()
                     return
 
-                # 等待一段时间让系统响应
+                # Wait for system to respond
                 logger.info(f"[TaskManager] Waiting for system to respond...")
-                
-                # 分段等待，每秒检查一次停止标志
+
+                # Wait in segments, check stop flag every second
                 for _ in range(3):
                     if task.should_stop:
                         logger.info(f"[TaskManager] Task stop requested during wait")
@@ -558,7 +558,7 @@ class ReActTaskManager:
                         return
                     await asyncio.sleep(1)
 
-            # 达到最大迭代次数
+            # Maximum iterations reached
             logger.warning(f"[TaskManager] Maximum iterations reached: {task.max_iterations}")
             task.session.react_memory_store.finalize_memory(task.session_id, "max_iterations")
             task.complete("max_iterations", "Maximum iterations reached")
@@ -569,5 +569,5 @@ class ReActTaskManager:
             task.error(f"Error during ReAct execution: {str(e)}")
 
 
-# 全局任务管理器实例
+# Global task manager instance
 task_manager = ReActTaskManager()

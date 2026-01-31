@@ -1,5 +1,5 @@
 """
-UI-Ins API客户端模块
+UI-Ins API client module
 """
 import requests
 from typing import Optional
@@ -7,7 +7,7 @@ from config import Config
 from ..image.encoder import ImageEncoder
 
 class UIInsClient:
-    """UI-Ins API客户端类"""
+    """UI-Ins API client class"""
 
     def __init__(
         self,
@@ -15,11 +15,11 @@ class UIInsClient:
         model: Optional[str] = None
     ):
         """
-        初始化UI-Ins API客户端
+        Initialize UI-Ins API client
 
         Args:
             api_url: API URL
-            model: 模型名称
+            model: Model name
         """
         self.api_url = api_url or Config.DEFAULT_UI_MODEL_API_URL
         self.model = model or Config.DEFAULT_UI_MODEL
@@ -27,17 +27,17 @@ class UIInsClient:
 
     def call_api(self, image_path: str, instruction: str) -> str:
         """
-        调用UI-Ins API
+        Call UI-Ins API
 
         Args:
-            image_path: 图像文件路径
-            instruction: 指令文本
+            image_path: Image file path
+            instruction: Instruction text
 
         Returns:
-            API响应文本
+            API response text
         """
         try:
-            # 构建请求体
+            # Build request body
             messages = [
                 {
                     "role":"system",
@@ -59,7 +59,7 @@ class UIInsClient:
                 "model": self.model
             }
 
-            # 发送POST请求
+            # Send POST request
             response = requests.post(
                 self.api_url,
                 json=payload,
@@ -69,10 +69,10 @@ class UIInsClient:
                 timeout=self.timeout
             )
 
-            # 检查响应状态
+            # Check response status
             if response.status_code == 200:
                 data = response.json()
-                # 提取响应内容
+                # Extract response content
                 if "choices" in data and len(data["choices"]) > 0:
                     choice = data["choices"][0]
                     if "message" in choice:

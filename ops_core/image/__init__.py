@@ -1,5 +1,5 @@
 """
-图像处理模块
+Image processing module
 """
 from .encoder import ImageEncoder
 from .drawer import ImageDrawer

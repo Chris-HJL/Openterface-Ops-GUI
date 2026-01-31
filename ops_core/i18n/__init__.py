@@ -1,5 +1,5 @@
 """
-国际化功能模块
+Internationalization module
 """
 from .translator import Translator
 

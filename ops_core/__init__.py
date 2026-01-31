@@ -1,5 +1,5 @@
 """
-核心功能模块
+Core functionality module
 """
 from .i18n import Translator
 from .image import ImageEncoder, ImageDrawer
