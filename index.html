@@ -104,14 +104,20 @@
         .chat-input {
             display: flex;
             gap: 10px;
+            flex-direction: column;
         }
-        
+
         #query-input {
             flex: 1;
             padding: 10px;
             border: 1px solid #ddd;
             border-radius: 4px;
             font-size: 16px;
+            resize: none;
+            min-height: 80px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: inherit;
         }
         
         button {
@@ -561,7 +567,7 @@ export UI_API_KEY=your_ui_api_key</pre>
                 </div>
             </div>
             <div class="chat-input">
-                <input type="text" id="query-input" placeholder="Enter your query...">
+                <textarea id="query-input" placeholder="Enter your query..."></textarea>
                 <button id="send-btn">Send</button>
             </div>
             <div id="error-message" class="error"></div>
@@ -1586,8 +1592,9 @@ UI-Model API Status: ${data.ui_model_status}`;
             }
         });
         
-        document.getElementById('query-input').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
+        document.getElementById('query-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
                 sendQuery();
             }
         });
