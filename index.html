@@ -34,6 +34,11 @@
             padding: 20px;
             margin-bottom: 20px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            display: none;
+        }
+
+        .image-section.active {
+            display: block;
         }
         
         .image-container {
@@ -471,6 +476,10 @@
                     <label for="ui-model">UI-Model:</label>
                     <input type="text" id="ui-model" placeholder="Enter UI-Model Name" value="gui-owl-7b">
                 </div>
+                <div class="config-item">
+                    <label for="react-max-iterations">Agent Max Iterations:</label>
+                    <input type="number" id="react-max-iterations" placeholder="Enter max iterations" value="20" min="1">
+                </div>
             </div>
             <div style="margin-top: 15px; padding: 15px; background-color: #f5f5f5; border-radius: 4px;">
                 <h4>API Key Configuration</h4>
@@ -628,14 +637,15 @@ export UI_API_KEY=your_ui_api_key</pre>
 /load docs - Load documents and build index<br>
 /unload docs - Close document index<br>
 /image - Get latest image<br>
-/react [task] [max_iterations] - Start ReAct agent mode<br>
+/react [task] - Start ReAct agent mode<br>
 /stop-react - Stop running ReAct agent`;
                     addMessage(helpMessage, 'assistant');
                     
                     // Clear images
                     document.getElementById('original-image').src = '';
                     document.getElementById('processed-image').src = '';
-                    
+                    document.querySelector('.image-section').classList.remove('active');
+
                     // Clear error message
                     document.getElementById('error-message').textContent = '';
                 } else {
@@ -665,6 +675,7 @@ export UI_API_KEY=your_ui_api_key</pre>
                 if (data.success && data.image) {
                     // Only display original image
                     document.getElementById('original-image').src = `data:image/jpeg;base64,${data.image}`;
+                    document.querySelector('.image-section').classList.add('active');
                 }
             } catch (error) {
                 console.error('Failed to get images:', error);
@@ -709,6 +720,11 @@ export UI_API_KEY=your_ui_api_key</pre>
                     const data = await response.json();
                     if (data.success) {
                         addMessage('Chat history cleared', 'assistant');
+
+                        // Clear images
+                        document.getElementById('original-image').src = '';
+                        document.getElementById('processed-image').src = '';
+                        document.querySelector('.image-section').classList.remove('active');
                     } else {
                         throw new Error('Failed to clear history');
                     }
@@ -735,7 +751,7 @@ export UI_API_KEY=your_ui_api_key</pre>
 /load docs - Load documents and build index<br>
 /unload docs - Close document index<br>
 /image - Get latest image<br>
-/react [task] [max_iterations] - Start ReAct agent mode<br>
+/react [task] - Start ReAct agent mode<br>
 /stop-react - Stop running ReAct agent`;
                 
                 addMessage(helpMessage, 'assistant');
@@ -928,10 +944,14 @@ UI-Model API Status: ${data.ui_model_status}`;
             if (query.toLowerCase() === '/image') {
                 // Add user message
                 addMessage(query, 'user');
-                
+
                 // Clear input box
                 queryInput.value = '';
-                
+
+                // Clear previous images
+                document.getElementById('original-image').src = '';
+                document.getElementById('processed-image').src = '';
+
                 // Call get image function
                 try {
                     await fetchImages();
@@ -948,37 +968,31 @@ UI-Model API Status: ${data.ui_model_status}`;
             if (query.toLowerCase().startsWith('/react')) {
                 addMessage(query, 'user');
                 queryInput.value = '';
-                
+
+                // Clear images
+                document.getElementById('original-image').src = '';
+                document.getElementById('processed-image').src = '';
+                document.querySelector('.image-section').classList.remove('active');
+
                 let task = '';
-                let maxIterations = 20;
-                
+
                 const commandPart = query.substring(6).trim();
-                
+
                 if (!commandPart) {
-                    addMessage('Usage: /react [task] [max_iterations]<br>Example: /react "Open Notepad and type Hello" 20<br>Or: /react Open Notepad 20', 'assistant');
+                    addMessage('Usage: /react [task] <br>Example: /react "Open Notepad and type Hello" <br>Note: Max iterations is set in the configuration area above', 'assistant');
                     return;
                 }
-                
-                const lastSpaceIndex = commandPart.lastIndexOf(' ');
-                if (lastSpaceIndex > 0) {
-                    const lastPart = commandPart.substring(lastSpaceIndex + 1);
-                    const parsedIterations = parseInt(lastPart);
-                    
-                    if (!isNaN(parsedIterations) && parsedIterations > 0) {
-                        maxIterations = parsedIterations;
-                        task = commandPart.substring(0, lastSpaceIndex).trim();
-                    } else {
-                        task = commandPart;
-                    }
-                } else {
-                    task = commandPart;
-                }
-                
+
+                task = commandPart;
+
                 if (!task) {
-                    addMessage('Usage: /react [task] [max_iterations]<br>Example: /react "Open Notepad and type Hello" 20<br>Or: /react Open Notepad 20', 'assistant');
+                    addMessage('Usage: /react [task] <br>Example: /react "Open Notepad and type Hello" <br>Note: Max iterations is set in the configuration area above', 'assistant');
                     return;
                 }
-                
+
+                // Get max iterations from configuration
+                const maxIterations = parseInt(document.getElementById('react-max-iterations').value) || 20;
+
                 addMessage(`Starting ReAct agent with task: "${task}" (max iterations: ${maxIterations})`, 'assistant');
                 
                 // Show ReAct section
@@ -1299,6 +1313,7 @@ UI-Model API Status: ${data.ui_model_status}`;
             
             // Clear current processed image
             document.getElementById('processed-image').src = '';
+            document.querySelector('.image-section').classList.remove('active');
             
             // Get send button element
             const sendBtn = document.getElementById('send-btn');
@@ -1348,6 +1363,7 @@ UI-Model API Status: ${data.ui_model_status}`;
                     // If there is an image, update processed image
                     if (data.image) {
                         document.getElementById('processed-image').src = `data:image/jpeg;base64,${data.image}`;
+                        document.querySelector('.image-section').classList.add('active');
                     }
                 } else {
                     throw new Error('API response failed');
