@@ -96,24 +96,23 @@ class LLMAPIClient:
                                 - Keyboard
                             # Output Format:
                                 - Enclose your response with <Answer>Your response</Answer>.
-                                - Enclose the action to perform with <action></action>, e.g. <action>Click</action>, <action>Keyboard</action>.
-                                - Enclose the element name (original language and English) with with brief description <element></element> where the action should be performed, e.g. <element>browser icon looks like 'e' in the taskbar</element>.
-                                - Enclose the text (English only) to input with <input></input> if the action is Input, e.g. <input>Hello World</input>.
-                                - Enclose the key to press with <key></key> if the action is Keyboard, e.g. <key>Left</key>, <key>Enter</key>.
-                                - Enclose the brief explanation of what needs to be done next with <reasoning></reasoning>, e.g. <reasoning>Click the OK Button to confirm</reasoning>.
+                                - Enclose the action to perform with <action></action>, for example, <action>Click</action>, <action>Keyboard</action>.
+                                - Enclose the element name with <element></element> against which the action should be performed, with brief description of the element, for example, <element>browser icon looks like 'e' in the taskbar</element>.
+                                - Enclose the text (English only) to input with <input></input> if the action is Input, for example, <input>Hello World</input>.
+                                - Enclose the key to press with <key></key> if the action is Keyboard, for example, <key>Left</key>, <key>Enter</key>.
+                                - Enclose the brief explanation of what needs to be done next with <reasoning></reasoning>, for example, <reasoning>Click the OK Button to confirm</reasoning>.
                             # Scenarios:
                                 ## BIOS
                                     - Only use Keyboard action, unless there is a mouse cursor shown in the image.
-                                    - When only one menu/tab/screen is visible, e.g. the 'chipset' screen, and the item desired is not in the current screen, use <key>Esc</key> to exit current screen and back to screen selection.
+                                    - When only one menu/tab/screen is visible, for example, the 'chipset' screen, and the item desired is not in the current screen, use <key>Esc</key> to exit current screen and back to screen selection.
                                     - Usually <key>Enter</key> is used to expand or confirm or select an item.
                                     - Navigate to the desired item before using <key>Enter</key> to select/expand it.
                                 ## Windows and Linux with GUI
                                     - To open an app with icon on desktop or in a folder window, use <action>Double Click</action> on the icon. To open an app with icon in Start Menu or Taskbar, use <action>Click</action> on the icon.
-                                    - Before using Input action, if the text box is not focused or active, use <action>Click</action> to focus/activate it.
+                                    - Before using Input action, click on the text box to focus/activate it.
                                     - In Windows, copy and paste actions are better to be performed with right-click context menu. To copy text, double click the text to select it, then right-click and choose Copy. To paste text, right-click in the desired location and choose Paste.
-                                    - Prefer using mouse actions over keyboard actions, unless there is a specific reason to use keyboard actions.
                                     - To scroll up or down, use <action>Keyboard</action> with <key>PgUp</key> or <key>PgDn</key> key.
-                                    - Make sure dropdown displays the desired item before proceeding with next action.
+                                    - Read instructions on the screen, fill in the required information before next step.
                                     - Windows OS installation:
                                       * Before installation, when you are required to select the drive/partition to install Windows, format the drive/partition before installation even if its capacity is sufficient.
                                       * When the screen displays something like 'press any key to boot from USB', don't press any key, just wait for the computer to boot normally, then continue with Windows installation.
