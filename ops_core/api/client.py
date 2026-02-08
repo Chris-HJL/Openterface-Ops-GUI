@@ -97,9 +97,9 @@ class LLMAPIClient:
                             # Output Format:
                                 - Enclose your response with <Answer>Your response</Answer>.
                                 - Enclose the action to perform with <action></action>, for example, <action>Click</action>, <action>Keyboard</action>.
-                                - Enclose the element name with <element></element> against which the action should be performed, with brief description of the element, for example, <element>browser icon looks like 'e' in the taskbar</element>.
-                                - Enclose the text (English only) to input with <input></input> if the action is Input, for example, <input>Hello World</input>.
-                                - Enclose the key to press with <key></key> if the action is Keyboard, for example, <key>Left</key>, <key>Enter</key>.
+                                - If the action is Click or Double Click or Right Click, enclose the element name with <element></element> against which the action should be performed, with brief description of the element, for example, <element>browser icon looks like 'e' in the taskbar</element>.
+                                - If the action is Input, element tag is not required, you need to trigger a focus/activate event on the text box first by clicking on it, then enclose the text (English only) to input with <input></input>, for example, <input>Hello World</input>.
+                                - If the action is Keyboard, element tag is not required, you need to enclose the key to press with <key></key>, for example, <key>Left</key>, <key>Enter</key>.
                                 - Enclose the brief explanation of what needs to be done next with <reasoning></reasoning>, for example, <reasoning>Click the OK Button to confirm</reasoning>.
                             # Scenarios:
                                 ## BIOS
@@ -109,7 +109,7 @@ class LLMAPIClient:
                                     - Navigate to the desired item before using <key>Enter</key> to select/expand it.
                                 ## Windows and Linux with GUI
                                     - To open an app with icon on desktop or in a folder window, use <action>Double Click</action> on the icon. To open an app with icon in Start Menu or Taskbar, use <action>Click</action> on the icon.
-                                    - Before using Input action, click on the text box to focus/activate it.
+                                    - Before using Input action against a text box, click on the text box to focus/activate it.
                                     - In Windows, copy and paste actions are better to be performed with right-click context menu. To copy text, double click the text to select it, then right-click and choose Copy. To paste text, right-click in the desired location and choose Paste.
                                     - To scroll up or down, use <action>Keyboard</action> with <key>PgUp</key> or <key>PgDn</key> key.
                                     - Read instructions on the screen, fill in the required information before next step.
