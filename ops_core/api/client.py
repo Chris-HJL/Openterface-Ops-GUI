@@ -101,15 +101,22 @@ class LLMAPIClient:
                                 - If the action is Input, element tag is not required, you need to trigger a focus/activate event on the text box first by clicking on it, then enclose the text (English only) to input with <input></input>, for example, <input>Hello World</input>.
                                 - If the action is Keyboard, element tag is not required, you need to enclose the key to press with <key></key>, for example, <key>Left</key>, <key>Enter</key>.
                                 - Enclose the brief explanation of what needs to be done next with <reasoning></reasoning>, for example, <reasoning>Click the OK Button to confirm</reasoning>.
-                            # Scenarios:
-                                ## BIOS
+                            # CRITICAL RULES - MUST FOLLOW:
+                                ## Input Action - TWO-STEP PROCESS REQUIRED:
+                                    - ALWAYS perform Click action FIRST to focus/activate the text box BEFORE using Input action.
+                                    - NEVER use Input action directly without first clicking on the target text box.
+                                    - This is a MANDATORY two-step process: Step 1: Click on text box, Step 2: Input text.
+                                    - Example: To type "Hello" in a search box:
+                                        * First action: <action>Click</action> <element>search input box</element> <reasoning>Click on the search box to focus it</reasoning>
+                                        * Second action: <action>Input</action> <input>Hello</input> <reasoning>Type 'Hello' in the focused search box</reasoning>
+                                ## BIOS Operation
                                     - Only use Keyboard action, unless there is a mouse cursor shown in the image.
                                     - When only one menu/tab/screen is visible, for example, the 'chipset' screen, and the item desired is not in the current screen, use <key>Esc</key> to exit current screen and back to screen selection.
                                     - Usually <key>Enter</key> is used to expand or confirm or select an item.
                                     - Navigate to the desired item before using <key>Enter</key> to select/expand it.
-                                ## Windows and Linux with GUI
-                                    - To open an app with icon on desktop or in a folder window, use <action>Double Click</action> on the icon. To open an app with icon in Start Menu or Taskbar, use <action>Click</action> on the icon.
-                                    - Before using Input action against a text box, click on the text box to focus/activate it.
+                                ## Windows and Linux with GUI Operation
+                                    - To trigger icons on desktop or in a folder window, use <action>Double Click</action> on the icon. To open an app with icon in Start Menu or Taskbar, use <action>Click</action> on the icon.
+                                    - **IMPORTANT**: Before using Input action against a text box, you MUST first click on the text box to focus/activate it. This is a mandatory two-step process.
                                     - In Windows, copy and paste actions are better to be performed with right-click context menu. To copy text, double click the text to select it, then right-click and choose Copy. To paste text, right-click in the desired location and choose Paste.
                                     - To scroll up or down, use <action>Keyboard</action> with <key>PgUp</key> or <key>PgDn</key> key.
                                     - Read instructions on the screen, fill in the required information before next step.
