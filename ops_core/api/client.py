@@ -102,27 +102,34 @@ class LLMAPIClient:
                                 - If the action is Keyboard, element tag is not required, you need to enclose the key to press with <key></key>, for example, <key>Left</key>, <key>Enter</key>.
                                 - Enclose the brief explanation of what needs to be done next with <reasoning></reasoning>, for example, <reasoning>Click the OK Button to confirm</reasoning>.
                             # CRITICAL RULES - MUST FOLLOW:
+                                ## Screen Awareness and Prompt Response:
+                                    - **Identify and take appropriate actions for the following types of UI elements**:
+                                        * **Dropdowns with default placeholder text**: Text like "Select...", "Security questions 3/3", "Choose an option", etc. are PLACEHOLDER/DEFAULT values, NOT selected options. You MUST click on these dropdowns to open the selection menu and choose an actual option.
+                                        * **Dropdowns with empty values**: Empty dropdowns also require clicking to open and select an option.
+                                        * **How to identify placeholder text**: Look for generic, non-specific text that indicates user action is needed (e.g., "Select...", "Choose...", "Please select", numbered placeholders like "Security questions 3/3").
+                                        * **Action required**: Always perform <action>Click</action> on dropdown elements showing placeholder or empty values to open the dropdown menu, then select the appropriate option.
+                                    - **In your reasoning**, explicitly reference the specific prompt or warning message from the screen that guides your action decision.**
+                                ## Clearing Text Box:
+                                    - **ALWAYS double-click the text box first to select all text, then use Backspace or Delete key to clear the text.**
                                 ## Input Action - TWO-STEP PROCESS REQUIRED:
-                                    - ALWAYS perform Click action FIRST to focus/activate the text box BEFORE using Input action.
+                                    - **ALWAYS perform Click action FIRST to focus/activate the text box BEFORE using Input action.**
                                     - NEVER use Input action directly without first clicking on the target text box.
-                                    - This is a MANDATORY two-step process: Step 1: Click on text box, Step 2: Input text.
                                     - Example: To type "Hello" in a search box:
                                         * First action: <action>Click</action> <element>search input box</element> <reasoning>Click on the search box to focus it</reasoning>
                                         * Second action: <action>Input</action> <input>Hello</input> <reasoning>Type 'Hello' in the focused search box</reasoning>
-                                ## BIOS Operation
+                                ## BIOS Operation:
                                     - Only use Keyboard action, unless there is a mouse cursor shown in the image.
                                     - When only one menu/tab/screen is visible, for example, the 'chipset' screen, and the item desired is not in the current screen, use <key>Esc</key> to exit current screen and back to screen selection.
                                     - Usually <key>Enter</key> is used to expand or confirm or select an item.
                                     - Navigate to the desired item before using <key>Enter</key> to select/expand it.
-                                ## Windows and Linux with GUI Operation
+                                ## Windows and Linux with GUI Operation:
                                     - To trigger icons on desktop or in a folder window, use <action>Double Click</action> on the icon. To open an app with icon in Start Menu or Taskbar, use <action>Click</action> on the icon.
-                                    - **IMPORTANT**: Before using Input action against a text box, you MUST first click on the text box to focus/activate it. This is a mandatory two-step process.
                                     - In Windows, copy and paste actions are better to be performed with right-click context menu. To copy text, double click the text to select it, then right-click and choose Copy. To paste text, right-click in the desired location and choose Paste.
                                     - To scroll up or down, use <action>Keyboard</action> with <key>PgUp</key> or <key>PgDn</key> key.
                                     - Read instructions on the screen, fill in the required information before next step.
                                     - Windows OS installation:
-                                      * Before installation, when you are required to select the drive/partition to install Windows, format the drive/partition before installation even if its capacity is sufficient.
-                                      * When the screen displays something like 'press any key to boot from USB', don't press any key, just wait for the computer to boot normally, then continue with Windows installation.
+                                       * Before installation, when you are required to select the drive/partition to install Windows, format the drive/partition before installation even if its capacity is sufficient.
+                                       * When the screen displays something like 'press any key to boot from USB', don't press any key, just wait for the computer to boot normally, then continue with Windows installation.
                         """
                     })
             else:

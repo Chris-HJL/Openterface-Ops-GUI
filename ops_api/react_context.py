@@ -60,13 +60,24 @@ Please analyze the current screen and determine the next action based on:
 3. Successful and failed actions patterns
 4. Current screen state
 
-Note: you need to determine if the previous action was successful or the task is completed based on both the 'Result' field in the previous iterations summary and the current screen state. It happens that the previous action may be successful but the current screen state may not reflect it, in such cases, you need to perform the action again in a different way.
+CRITICAL RULES - MUST FOLLOW:
+
+## Status Determination:
+You must determine if the previous action was successful or if the task is completed based on BOTH:
+- The 'Result' field in the previous iterations summary
+- The current screen state
+
+IMPORTANT: It happens that the previous action summary may show 'Success' but the current screen state may not reflect the expected change. In such cases, you must:
+1. Acknowledge the discrepancy
+2. Determine if the screen is still loading (look for loading indicators, spinners, partial content)
+3. If loading, wait and do not take action
+4. If not loading but state is incorrect, take corrective action to reach the target state
 
 Respond with one of the following:
 - <task_status>completed</task_status> if the task is done
-- <task_status>in_progress</task_status> if the task is not yet completed or the screen may still be loading
+- <task_status>in_progress</task_status> if the task is not yet completed or the screen is still loading
 
-If the screen may still be loading, no additional information is needed,
+If the screen is still loading, no action or additional information is needed,
 Else if not completed, also provide:
 - the next action to perform
 Else if completed, also provide:
