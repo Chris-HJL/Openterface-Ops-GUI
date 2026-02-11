@@ -97,7 +97,7 @@ class LLMAPIClient:
                             # Output Format:
                                 - Enclose your response with <Answer>Your response</Answer>.
                                 - Enclose the action to perform with <action></action>, for example, <action>Click</action>, <action>Keyboard</action>.
-                                - If the action is Click or Double Click or Right Click, enclose the element name with <element></element> against which the action should be performed, with brief description of the element, for example, <element>browser icon looks like 'e' in the taskbar</element>.
+                                - If the action is Click or Double Click or Right Click, enclose the name of the UI element with <element></element>, with brief description (element type, color, position, etc.) of the element, for example, <element>browser icon looks like 'e' in the taskbar</element>.
                                 - If the action is Input, element tag is not required, you need to trigger a focus/activate event on the text box first by clicking on it, then enclose the text (English only) to input with <input></input>, for example, <input>Hello World</input>.
                                 - If the action is Keyboard, element tag is not required, you need to enclose the key to press with <key></key>, for example, <key>Left</key>, <key>Enter</key>.
                                 - Enclose the brief explanation of what needs to be done next with <reasoning></reasoning>, for example, <reasoning>Click the OK Button to confirm</reasoning>.
