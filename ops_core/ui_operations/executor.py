@@ -7,6 +7,7 @@ import os
 from config import Config
 from .parser import ResponseParser
 from .ui_ins_client import UIInsClient
+from .checkbox_detector import CheckboxDetector
 from ..image.drawer import ImageDrawer
 from ..image_server.client import ImageServerClient
 
@@ -24,6 +25,51 @@ class CommandExecutor:
         self.ui_ins_client = UIInsClient(ui_ins_api_url, ui_ins_model)
         self.image_server_client = ImageServerClient()
         self.parser = ResponseParser()
+        self.checkbox_detector = CheckboxDetector()
+
+    def _is_checkbox_element(self, element: str) -> bool:
+        """
+        Check if the element description indicates a checkbox
+
+        Args:
+            element: Element description
+
+        Returns:
+            True if element is likely a checkbox
+        """
+        if not element:
+            return False
+        element_lower = element.lower()
+        checkbox_keywords = [
+            'checkbox', 'check box', 'check-box',
+            '复选框', '勾选框', '选择框'
+        ]
+        return any(keyword in element_lower for keyword in checkbox_keywords)
+
+    def _refine_checkbox_coordinates(
+        self,
+        image_path: str,
+        point_x: int,
+        point_y: int
+    ) -> Tuple[int, int]:
+        """
+        Refine coordinates using checkbox detection
+
+        Args:
+            image_path: Image file path
+            point_x: Initial X coordinate
+            point_y: Initial Y coordinate
+
+        Returns:
+            Refined (x, y) coordinates
+        """
+        refined = self.checkbox_detector.find_checkbox_near_point(
+            image_path, point_x, point_y
+        )
+        if refined:
+            print(f"Checkbox detected: original ({point_x}, {point_y}) -> refined ({refined[0]}, {refined[1]})")
+            return refined
+        return (point_x, point_y)
 
     def process_ui_element_request(
         self,
@@ -50,34 +96,33 @@ class CommandExecutor:
         """
         try:
             if action in ["Click", "Double Click", "Right Click"] and element:
-                # Call UI-Model API to get coordinates
                 ui_model_response = self.ui_ins_client.call_api(image_path, element)
                 print(f"UI-Model Response: {ui_model_response}")
 
-                # Parse coordinates
                 point_x, point_y = self.parser.parse_coordinates(ui_model_response)
 
                 if point_x != -1:
-                    # Generate output image path
+                    if self._is_checkbox_element(element):
+                        point_x, point_y = self._refine_checkbox_coordinates(
+                            image_path, point_x, point_y
+                        )
+
                     base_name = os.path.basename(image_path)
                     name, ext = os.path.splitext(base_name)
                     output_path = os.path.join(Config.OUTPUT_DIR, f"{name}_ui_model{ext}")
 
-                    # Default box size
                     box_size = 50
                     left = point_x - box_size // 2
                     top = point_y - box_size // 2
                     right = point_x + box_size // 2
                     bottom = point_y + box_size // 2
 
-                    # Ensure box within image boundaries
                     width, height = Image.open(image_path).size
                     left = max(0, left)
                     top = max(0, top)
                     right = min(width - 1, right)
                     bottom = min(height - 1, bottom)
 
-                    # Draw rectangle
                     ImageDrawer.draw_rectangle(
                         image_path,
                         (left, top),
@@ -85,7 +130,6 @@ class CommandExecutor:
                         output_path
                     )
 
-                    # Build and send script command to server
                     if action == "Click":
                         script_command = f'Send "{{Click {point_x}, {point_y}}}"'
                     elif action == "Double Click":
