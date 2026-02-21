@@ -39,3 +39,8 @@ class Config:
     def get_api_key(cls) -> str:
         """Get API key"""
         return cls.get_env("LLM_API_KEY", "EMPTY")
+
+    @classmethod
+    def get_ui_api_key(cls) -> str:
+        """Get UI-Model API key"""
+        return cls.get_env("UI_API_KEY", "EMPTY")

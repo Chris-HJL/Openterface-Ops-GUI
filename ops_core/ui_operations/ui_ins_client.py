@@ -12,7 +12,8 @@ class UIInsClient:
     def __init__(
         self,
         api_url: Optional[str] = None,
-        model: Optional[str] = None
+        model: Optional[str] = None,
+        api_key: Optional[str] = None
     ):
         """
         Initialize UI-Ins API client
@@ -20,9 +21,11 @@ class UIInsClient:
         Args:
             api_url: API URL
             model: Model name
+            api_key: API key
         """
         self.api_url = api_url or Config.DEFAULT_UI_MODEL_API_URL
         self.model = model or Config.DEFAULT_UI_MODEL
+        self.api_key = api_key or Config.get_ui_api_key()
         self.timeout = 120
 
     def call_api(self, image_path: str, instruction: str) -> str:
@@ -64,7 +67,8 @@ class UIInsClient:
                 self.api_url,
                 json=payload,
                 headers={
-                    "Content-Type": "application/json"
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {self.api_key}"
                 },
                 timeout=self.timeout
             )

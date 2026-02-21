@@ -14,15 +14,16 @@ from ..image_server.client import ImageServerClient
 class CommandExecutor:
     """Command executor class"""
 
-    def __init__(self, ui_ins_api_url: str = None, ui_ins_model: str = None):
+    def __init__(self, ui_ins_api_url: str = None, ui_ins_model: str = None, ui_ins_api_key: str = None):
         """
         Initialize command executor
 
         Args:
             ui_ins_api_url: UI-Ins API URL
             ui_ins_model: UI-Ins model name
+            ui_ins_api_key: UI-Ins API key
         """
-        self.ui_ins_client = UIInsClient(ui_ins_api_url, ui_ins_model)
+        self.ui_ins_client = UIInsClient(ui_ins_api_url, ui_ins_model, ui_ins_api_key)
         self.image_server_client = ImageServerClient()
         self.parser = ResponseParser()
         self.checkbox_detector = CheckboxDetector()
