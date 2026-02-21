@@ -77,7 +77,7 @@ Respond with one of the following:
 - <task_status>completed</task_status> if the task is done
 - <task_status>in_progress</task_status> if the task is not yet completed or the screen is still loading
 
-If the screen is still loading, no action or additional information is needed,
+If the screen is still loading, NO action or additional information should be provided,
 Else if not completed, also provide:
 - the next action to perform
 Else if completed, also provide:
