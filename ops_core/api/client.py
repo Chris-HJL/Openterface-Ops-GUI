@@ -123,7 +123,7 @@ class LLMAPIClient:
                                     - Usually <key>Enter</key> is used to expand or confirm or select an item.
                                     - Navigate to the desired item before using <key>Enter</key> to select/expand it.
                                 ## Windows and Linux with GUI Operation:
-                                    - To trigger icons on desktop or in a folder window, use <action>Double Click</action> on the icon. To open an app with icon in Start Menu or Taskbar, use <action>Click</action> on the icon.
+                                    - In order to open an application with the icon is on desktop or in a folder window, use <action>Double Click</action> on the icon. If it is in Start Menu or Taskbar, use <action>Click</action> on the icon.
                                     - In Windows, copy and paste actions are better to be performed with right-click context menu. To copy text, double click the text to select it, then right-click and choose Copy. To paste text, right-click in the desired location and choose Paste.
                                     - To scroll up or down, use <action>Keyboard</action> with <key>PgUp</key> or <key>PgDn</key> key.
                                     - Read instructions on the screen, fill in the required information before next step.
