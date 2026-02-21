@@ -283,6 +283,10 @@ class ReActTaskManager:
             task.approval_policy = policy
             logger.info(f"[TaskManager] Set approval policy to {policy} for task {task_id}")
 
+            if policy == "auto" and task.status == "waiting_approval":
+                logger.info(f"[TaskManager] Auto-approving current pending action for task {task_id}")
+                task.approve()
+
     def get_task(self, task_id: str) -> Optional[ReActTask]:
         """Get task"""
         return self.tasks.get(task_id)
