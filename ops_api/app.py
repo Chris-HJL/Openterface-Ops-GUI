@@ -1,10 +1,23 @@
 """
 FastAPI application configuration
 """
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from .endpoints import router
+from .endpoints import router, session_manager
+from .task_manager import task_manager
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan manager"""
+    task_manager.start_cleanup_task()
+    session_manager.start_cleanup_task()
+    yield
+    task_manager.stop_cleanup_task()
+    session_manager.stop_cleanup_task()
+
 
 def create_app() -> FastAPI:
     """
@@ -14,7 +27,7 @@ def create_app() -> FastAPI:
         FastAPI application instance
     """
     # Create FastAPI application
-    app = FastAPI(title="Openterface Ops API", version="2.0.0")
+    app = FastAPI(title="Openterface Ops API", version="2.0.0", lifespan=lifespan)
 
     # Configure CORS
     app.add_middleware(

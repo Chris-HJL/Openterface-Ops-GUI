@@ -30,6 +30,13 @@ class Config:
     DEFAULT_LANGUAGE: str = "en"
     MAX_REACT_ITERATIONS: int = 20
 
+    # 清理配置
+    TASK_TTL_SECONDS: int = 3600
+    SESSION_TTL_SECONDS: int = 7200
+    MAX_TASKS: int = 100
+    MAX_SESSIONS: int = 50
+    CLEANUP_INTERVAL_SECONDS: int = 300
+
     @classmethod
     def get_env(cls, key: str, default: Optional[str] = None) -> Optional[str]:
         """Get environment variable"""

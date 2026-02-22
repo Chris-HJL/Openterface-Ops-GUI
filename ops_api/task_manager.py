@@ -8,16 +8,14 @@ import os
 import re
 import uuid
 from typing import Dict, Optional, List
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from ops_core import (
-    ImageServerClient,
-    LLMAPIClient,
-    ResponseParser,
-    CommandExecutor
+    ResponseParser
 )
 from ops_api.react_context import ReActContextBuilder
 from ops_api.react_memory import IterationRecord
+from config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -221,24 +219,95 @@ class ReActTaskManager:
     def __init__(self):
         self.tasks: Dict[str, ReActTask] = {}
         self.lock = asyncio.Lock()
+        self._cleanup_task: Optional[asyncio.Task] = None
+        self._running = True
+
+    def start_cleanup_task(self):
+        """Start background cleanup task"""
+        if self._cleanup_task is None or self._cleanup_task.done():
+            self._cleanup_task = asyncio.create_task(self._cleanup_loop())
+            logger.info("[TaskManager] Started background cleanup task")
+
+    def stop_cleanup_task(self):
+        """Stop background cleanup task"""
+        self._running = False
+        if self._cleanup_task and not self._cleanup_task.done():
+            self._cleanup_task.cancel()
+            logger.info("[TaskManager] Stopped background cleanup task")
+
+    async def _cleanup_loop(self):
+        """Background cleanup loop"""
+        while self._running:
+            try:
+                await asyncio.sleep(Config.CLEANUP_INTERVAL_SECONDS)
+                await self.cleanup_expired_tasks()
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"[TaskManager] Cleanup loop error: {e}")
+
+    async def cleanup_expired_tasks(self):
+        """Clean up expired tasks"""
+        now = datetime.now()
+        ttl = timedelta(seconds=Config.TASK_TTL_SECONDS)
+        expired_task_ids = []
+
+        async with self.lock:
+            for task_id, task in list(self.tasks.items()):
+                if task.status in ["completed", "stopped", "error", "rejected"]:
+                    if now - task.updated_at > ttl:
+                        expired_task_ids.append(task_id)
+
+            for task_id in expired_task_ids:
+                del self.tasks[task_id]
+                logger.info(f"[TaskManager] Cleaned up expired task {task_id}")
+
+        if expired_task_ids:
+            logger.info(f"[TaskManager] Cleaned up {len(expired_task_ids)} expired tasks")
+
+    async def remove_task(self, task_id: str) -> bool:
+        """Remove a task manually"""
+        async with self.lock:
+            if task_id in self.tasks:
+                del self.tasks[task_id]
+                logger.info(f"[TaskManager] Manually removed task {task_id}")
+                return True
+        return False
 
     async def create_task(self, session_id: str, task_description: str, max_iterations: int, session, approval_policy: str = "manual") -> str:
         """Create new task"""
-        task_id = str(uuid.uuid4())
-        task = ReActTask(
-            task_id=task_id,
-            session_id=session_id,
-            task_description=task_description,
-            max_iterations=max_iterations,
-            session=session
-        )
-        task.approval_policy = approval_policy
-
         async with self.lock:
+            if len(self.tasks) >= Config.MAX_TASKS:
+                self._evict_oldest_completed_task()
+
+            task_id = str(uuid.uuid4())
+            task = ReActTask(
+                task_id=task_id,
+                session_id=session_id,
+                task_description=task_description,
+                max_iterations=max_iterations,
+                session=session
+            )
+            task.approval_policy = approval_policy
+
             self.tasks[task_id] = task
 
         logger.info(f"[TaskManager] Created task {task_id} for session {session_id} with policy {approval_policy}")
         return task_id
+
+    def _evict_oldest_completed_task(self):
+        """Evict the oldest completed task when limit is reached (must be called with lock held)"""
+        completed_tasks = [
+            (task_id, task.updated_at)
+            for task_id, task in self.tasks.items()
+            if task.status in ["completed", "stopped", "error", "rejected"]
+        ]
+
+        if completed_tasks:
+            completed_tasks.sort(key=lambda x: x[1])
+            oldest_task_id = completed_tasks[0][0]
+            del self.tasks[oldest_task_id]
+            logger.info(f"[TaskManager] Evicted oldest completed task {oldest_task_id} to make room")
 
     async def start_task(self, task_id: str):
         """Start task"""
@@ -330,6 +399,9 @@ class ReActTaskManager:
 
             logger.info(f"[TaskManager] Model: {model}, RAG enabled: {rag_enabled}")
 
+            # Get cached client instances from session
+            image_server_client = task.session.image_server_client
+
             # Execute iteration loop
             while not task.should_stop and task.current_iteration < task.max_iterations:
                 task.current_iteration += 1
@@ -337,8 +409,7 @@ class ReActTaskManager:
 
                 logger.info(f"[TaskManager] Iteration {iteration_num}/{task.max_iterations}")
 
-                # Fetch latest image from server
-                image_server_client = ImageServerClient()
+                # Fetch latest image from server using cached client
                 image_path = image_server_client.get_last_image()
 
                 # Check if need to stop
@@ -363,8 +434,8 @@ class ReActTaskManager:
                     iteration_num
                 )
 
-                # Get API response
-                api_client = LLMAPIClient(task.session.api_url, model)
+                # Get API response using cached client
+                api_client = task.session.get_llm_api_client(model=model)
                 response = api_client.get_response(
                     enhanced_prompt,
                     image_path=image_path,
@@ -497,10 +568,7 @@ class ReActTaskManager:
 
                 if action in ["Click", "Double Click", "Right Click"] and element and image_path:
                     logger.info(f"[TaskManager] Executing {action} on {element}")
-                    executor = CommandExecutor(
-                        task.session.ui_model_api_url,
-                        task.session.ui_model
-                    )
+                    executor = task.session.get_command_executor()
                     success, result = executor.process_ui_element_request(
                         image_path, element, action, element
                     )

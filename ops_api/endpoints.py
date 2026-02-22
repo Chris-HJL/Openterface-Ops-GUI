@@ -6,7 +6,7 @@ import base64
 import uuid
 import logging
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict
 from fastapi import HTTPException
 from PIL import Image
@@ -23,10 +23,7 @@ from ops_core import (
     IndexBuilder,
     DocumentRetriever,
     APIConnectionTester,
-    LLMAPIClient,
-    ImageServerClient,
-    ResponseParser,
-    CommandExecutor
+    ResponseParser
 )
 from config import Config
 
@@ -40,8 +37,109 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Global session dictionary
-sessions: Dict[str, Session] = {}
+class SessionManager:
+    """Session manager with cleanup support"""
+
+    def __init__(self):
+        self.sessions: Dict[str, Session] = {}
+        self.lock = asyncio.Lock()
+        self._cleanup_task: Optional[asyncio.Task] = None
+        self._running = True
+
+    def start_cleanup_task(self):
+        """Start background cleanup task"""
+        if self._cleanup_task is None or self._cleanup_task.done():
+            self._cleanup_task = asyncio.create_task(self._cleanup_loop())
+            logger.info("[SessionManager] Started background cleanup task")
+
+    def stop_cleanup_task(self):
+        """Stop background cleanup task"""
+        self._running = False
+        if self._cleanup_task and not self._cleanup_task.done():
+            self._cleanup_task.cancel()
+            logger.info("[SessionManager] Stopped background cleanup task")
+
+    async def _cleanup_loop(self):
+        """Background cleanup loop"""
+        while self._running:
+            try:
+                await asyncio.sleep(Config.CLEANUP_INTERVAL_SECONDS)
+                await self.cleanup_expired_sessions()
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"[SessionManager] Cleanup loop error: {e}")
+
+    async def cleanup_expired_sessions(self):
+        """Clean up expired sessions"""
+        now = datetime.now()
+        ttl = timedelta(seconds=Config.SESSION_TTL_SECONDS)
+        expired_session_ids = []
+
+        async with self.lock:
+            for session_id, session in list(self.sessions.items()):
+                if now - session.updated_at > ttl:
+                    expired_session_ids.append(session_id)
+
+            for session_id in expired_session_ids:
+                del self.sessions[session_id]
+                logger.info(f"[SessionManager] Cleaned up expired session {session_id}")
+
+        if expired_session_ids:
+            logger.info(f"[SessionManager] Cleaned up {len(expired_session_ids)} expired sessions")
+
+    async def create_session(self, request: "CreateSessionRequest") -> tuple:
+        """Create new session with cleanup check"""
+        async with self.lock:
+            if len(self.sessions) >= Config.MAX_SESSIONS:
+                self._evict_oldest_session()
+
+            session_id = str(uuid.uuid4())
+            session = Session(session_id)
+
+            if request.language:
+                session.switch_language(request.language)
+            if request.api_url:
+                session.api_url = request.api_url
+            if request.model:
+                session.model = request.model
+            if request.ui_model_api_url:
+                session.ui_model_api_url = request.ui_model_api_url
+            if request.ui_model:
+                session.ui_model = request.ui_model
+
+            self.sessions[session_id] = session
+
+        logger.info(f"[SessionManager] Created session {session_id}")
+        return session_id, session
+
+    def _evict_oldest_session(self):
+        """Evict the oldest session when limit is reached (must be called with lock held)"""
+        if self.sessions:
+            oldest_session_id = min(
+                self.sessions.keys(),
+                key=lambda sid: self.sessions[sid].updated_at
+            )
+            del self.sessions[oldest_session_id]
+            logger.info(f"[SessionManager] Evicted oldest session {oldest_session_id} to make room")
+
+    def get_session(self, session_id: str) -> Optional[Session]:
+        """Get session and update activity timestamp"""
+        session = self.sessions.get(session_id)
+        if session:
+            session.touch()
+        return session
+
+    async def delete_session(self, session_id: str) -> bool:
+        """Delete a session manually"""
+        async with self.lock:
+            if session_id in self.sessions:
+                del self.sessions[session_id]
+                logger.info(f"[SessionManager] Manually deleted session {session_id}")
+                return True
+        return False
+
+session_manager = SessionManager()
 
 # Create FastAPI application
 from fastapi import APIRouter
@@ -73,22 +171,7 @@ def image_to_base64(filepath: str) -> str:
 @router.post("/create-session", response_model=SessionResponse)
 async def create_session(request: CreateSessionRequest):
     """Create new session"""
-    session_id = str(uuid.uuid4())
-    session = Session(session_id)
-
-    # Apply custom settings
-    if request.language:
-        session.switch_language(request.language)
-    if request.api_url:
-        session.api_url = request.api_url
-    if request.model:
-        session.model = request.model
-    if request.ui_model_api_url:
-        session.ui_model_api_url = request.ui_model_api_url
-    if request.ui_model:
-        session.ui_model = request.ui_model
-
-    sessions[session_id] = session
+    session_id, session = await session_manager.create_session(request)
     return SessionResponse(
         session_id=session_id,
         message="Session created successfully",
@@ -101,10 +184,10 @@ async def chat(request: ChatRequest):
     logger.info(f"[Chat Request] Session: {request.session_id}, Prompt: {request.prompt[:100]}...")
 
     # Get session
-    if request.session_id not in sessions:
+    session = session_manager.get_session(request.session_id)
+    if not session:
         logger.error(f"[Chat] Session not found: {request.session_id}")
         raise HTTPException(status_code=404, detail="Session not found")
-    session = sessions[request.session_id]
 
     # Use session or requested model
     model = request.model or session.model
@@ -122,7 +205,7 @@ async def chat(request: ChatRequest):
     # Then check if request to get image from server
     elif request.get_image_from_server:
         logger.info("[Chat] Fetching image from server...")
-        image_server_client = ImageServerClient()
+        image_server_client = session.image_server_client
         image_path = image_server_client.get_last_image()
         if image_path and not image_path.startswith("./images"):
             logger.error(f"[Chat] Failed to get image from server: {image_path}")
@@ -148,7 +231,7 @@ async def chat(request: ChatRequest):
 
     # Get API response
     logger.info(f"[Chat] Calling LLM API at {session.api_url}...")
-    api_client = LLMAPIClient(session.api_url, model)
+    api_client = session.get_llm_api_client(model=model)
     if session.is_multiturn_mode:
         response = api_client.get_response(
             request.prompt,
@@ -191,7 +274,7 @@ async def chat(request: ChatRequest):
         # Process UI-Model
         logger.info(f"[Chat] Processing UI-Model request: {action} on {element}")
         try:
-            executor = CommandExecutor(session.ui_model_api_url, session.ui_model)
+            executor = session.get_command_executor()
             logger.info(f"[Chat] Calling UI-Model API at {session.ui_model_api_url} with model {session.ui_model}")
             success, result = executor.process_ui_element_request(
                 image_path, element, action, element
@@ -211,14 +294,14 @@ async def chat(request: ChatRequest):
     elif action == "Input" and input_content:
         # Process Input action - send text directly
         logger.info(f"[Chat] Sending input: {input_content}")
-        image_server_client = ImageServerClient()
+        image_server_client = session.image_server_client
         script_command = f'Send "{input_content}"'
         image_server_client.send_script_command(script_command)
         logger.info(f"[Chat] Input sent successfully")
     elif action == "Keyboard" and key_content:
         # Process Keyboard action - send key command
         logger.info(f"[Chat] Sending keyboard key: {key_content}")
-        image_server_client = ImageServerClient()
+        image_server_client = session.image_server_client
         script_command = f'Send "{{{key_content}}}"'
         image_server_client.send_script_command(script_command)
         logger.info(f"[Chat] Keyboard command sent successfully")
@@ -237,9 +320,9 @@ async def chat(request: ChatRequest):
 async def build_index(request: BuildIndexRequest):
     """Build RAG index from documents"""
     # Get session
-    if request.session_id not in sessions:
+    session = session_manager.get_session(request.session_id)
+    if not session:
         raise HTTPException(status_code=404, detail="Session not found")
-    session = sessions[request.session_id]
 
     # Build index
     builder = IndexBuilder()
@@ -265,10 +348,10 @@ async def create_react_task(request: CreateReactTaskRequest):
     logger.info(f"[ReAct Task] Task: {request.task}, Max iterations: {request.max_iterations}, Approval policy: {request.approval_policy}")
 
     # Get session
-    if request.session_id not in sessions:
+    session = session_manager.get_session(request.session_id)
+    if not session:
         logger.error(f"[ReAct Task] Session not found: {request.session_id}")
         raise HTTPException(status_code=404, detail="Session not found")
-    session = sessions[request.session_id]
 
     # Apply custom settings
     if request.model:
@@ -528,9 +611,9 @@ async def get_approval_history(task_id: str):
 async def get_status(session_id: str):
     """Get API status"""
     # Get session
-    if session_id not in sessions:
+    session = session_manager.get_session(session_id)
+    if not session:
         raise HTTPException(status_code=404, detail="Session not found")
-    session = sessions[session_id]
 
     # Check API connection
     tester = APIConnectionTester()
@@ -547,9 +630,9 @@ async def get_status(session_id: str):
 async def switch_language_api(request: SwitchLangRequest):
     """Switch language"""
     # Get session
-    if request.session_id not in sessions:
+    session = session_manager.get_session(request.session_id)
+    if not session:
         raise HTTPException(status_code=404, detail="Session not found")
-    session = sessions[request.session_id]
 
     # Switch language
     if request.lang_code in ["en", "zh"]:
@@ -569,9 +652,9 @@ async def switch_language_api(request: SwitchLangRequest):
 async def toggle_rag(request: ToggleRequest):
     """Toggle RAG functionality"""
     # Get session
-    if request.session_id not in sessions:
+    session = session_manager.get_session(request.session_id)
+    if not session:
         raise HTTPException(status_code=404, detail="Session not found")
-    session = sessions[request.session_id]
 
     # Toggle RAG
     session.rag_enabled = not session.rag_enabled
@@ -585,9 +668,9 @@ async def toggle_rag(request: ToggleRequest):
 async def toggle_multiturn(request: ToggleRequest):
     """Toggle multiturn mode"""
     # Get session
-    if request.session_id not in sessions:
+    session = session_manager.get_session(request.session_id)
+    if not session:
         raise HTTPException(status_code=404, detail="Session not found")
-    session = sessions[request.session_id]
 
     # If mode provided then set, otherwise toggle
     if request.mode is not None:
@@ -609,9 +692,9 @@ async def toggle_multiturn(request: ToggleRequest):
 async def clear_history(request: ClearHistoryRequest):
     """Clear conversation history"""
     # Get session
-    if request.session_id not in sessions:
+    session = session_manager.get_session(request.session_id)
+    if not session:
         raise HTTPException(status_code=404, detail="Session not found")
-    session = sessions[request.session_id]
 
     # Clear history
     session.clear_history()
@@ -625,12 +708,12 @@ async def clear_history(request: ClearHistoryRequest):
 async def get_image(request: GetImageRequest):
     """Get latest image from server"""
     # Get session
-    if request.session_id not in sessions:
+    session = session_manager.get_session(request.session_id)
+    if not session:
         raise HTTPException(status_code=404, detail="Session not found")
-    session = sessions[request.session_id]
 
-    # Get image from server
-    image_server_client = ImageServerClient()
+    # Get image from server using cached client
+    image_server_client = session.image_server_client
     image_path = image_server_client.get_last_image()
     if image_path and not image_path.startswith("./images"):
         return GetImageResponse(
@@ -664,10 +747,10 @@ async def react(request: ReactRequest):
     logger.info(f"[ReAct] Task: {request.task}, Max iterations: {request.max_iterations}")
     
     # Get session
-    if request.session_id not in sessions:
+    session = session_manager.get_session(request.session_id)
+    if not session:
         logger.error(f"[ReAct] Session not found: {request.session_id}")
         raise HTTPException(status_code=404, detail="Session not found")
-    session = sessions[request.session_id]
 
     # Check if already running
     if session.react_is_running:
@@ -706,9 +789,9 @@ async def react(request: ReactRequest):
 
             logger.info(f"[ReAct Session {request.session_id}] Iteration {iteration_num}/{session.react_max_iterations}")
 
-            # Fetch latest image from server
+            # Fetch latest image from server using cached client
             logger.info(f"[ReAct] Fetching image from server for iteration {iteration_num}")
-            image_server_client = ImageServerClient()
+            image_server_client = session.image_server_client
             image_path = image_server_client.get_last_image()
             if image_path and not image_path.startswith("./images"):
                 logger.error(f"[ReAct] Failed to get image from server: {image_path}")
@@ -741,9 +824,9 @@ async def react(request: ReactRequest):
             # Use memory to build enhanced prompt
             enhanced_prompt = context_builder.build_enhanced_prompt(base_prompt, iteration_num)
 
-            # Get API response
+            # Get API response using cached client
             logger.info(f"[ReAct] Calling LLM API to check task completion...")
-            api_client = LLMAPIClient(session.api_url, model)
+            api_client = session.get_llm_api_client(model=model)
             response = api_client.get_response(
                 enhanced_prompt,
                 image_path=image_path,
@@ -817,7 +900,7 @@ async def react(request: ReactRequest):
 
             if action in ["Click", "Double Click", "Right Click"] and element and image_path:
                 logger.info(f"[ReAct] Executing {action} on {element}")
-                executor = CommandExecutor(session.ui_model_api_url, session.ui_model)
+                executor = session.get_command_executor()
                 success, result = executor.process_ui_element_request(
                     image_path, element, action, element
                 )
@@ -886,9 +969,9 @@ async def react(request: ReactRequest):
 async def stop_react(request: StopReactRequest):
     """Stop ReAct agent"""
     # Get session
-    if request.session_id not in sessions:
+    session = session_manager.get_session(request.session_id)
+    if not session:
         raise HTTPException(status_code=404, detail="Session not found")
-    session = sessions[request.session_id]
 
     # Stop ReAct
     if session.react_is_running:
@@ -908,3 +991,23 @@ async def stop_react(request: StopReactRequest):
             final_status="not_running",
             success=False
         )
+
+
+@router.delete("/session/{session_id}")
+async def delete_session(session_id: str):
+    """Delete a session manually"""
+    success = await session_manager.delete_session(session_id)
+    if success:
+        return {"message": "Session deleted", "session_id": session_id, "success": True}
+    else:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+
+@router.delete("/task/{task_id}")
+async def delete_task(task_id: str):
+    """Delete a task manually"""
+    success = await task_manager.remove_task(task_id)
+    if success:
+        return {"message": "Task deleted", "task_id": task_id, "success": True}
+    else:
+        raise HTTPException(status_code=404, detail="Task not found")

@@ -2,7 +2,9 @@
 Session management module
 """
 from typing import Dict, Any, Optional, List
-from ops_core import Translator, DocumentRetriever
+from datetime import datetime
+from ops_core import Translator, DocumentRetriever, ImageServerClient, LLMAPIClient
+from ops_core.ui_operations import CommandExecutor
 from config import Config
 from .react_memory import ReActMemory, ReActMemoryStore
 
@@ -34,6 +36,52 @@ class Session:
         # ReAct memory system
         self.react_memory: Optional[ReActMemory] = None
         self.react_memory_store = ReActMemoryStore()
+
+        # Timestamps for cleanup
+        self.created_at = datetime.now()
+        self.updated_at = datetime.now()
+
+        # Cached client instances
+        self._image_server_client: Optional[ImageServerClient] = None
+        self._llm_api_client: Optional[LLMAPIClient] = None
+        self._command_executor: Optional[CommandExecutor] = None
+
+    @property
+    def image_server_client(self) -> ImageServerClient:
+        """Get or create ImageServerClient instance"""
+        if self._image_server_client is None:
+            self._image_server_client = ImageServerClient()
+        return self._image_server_client
+
+    def get_llm_api_client(self, api_url: Optional[str] = None, model: Optional[str] = None) -> LLMAPIClient:
+        """Get or create LLMAPIClient instance"""
+        effective_api_url = api_url or self.api_url
+        effective_model = model or self.model
+
+        if self._llm_api_client is None:
+            self._llm_api_client = LLMAPIClient(effective_api_url, effective_model)
+        elif effective_api_url != self._llm_api_client.api_url or effective_model != self._llm_api_client.model:
+            self._llm_api_client = LLMAPIClient(effective_api_url, effective_model)
+
+        return self._llm_api_client
+
+    def get_command_executor(self) -> CommandExecutor:
+        """Get or create CommandExecutor instance"""
+        if self._command_executor is None:
+            self._command_executor = CommandExecutor(
+                self.ui_model_api_url,
+                self.ui_model
+            )
+        return self._command_executor
+
+    def invalidate_clients(self):
+        """Invalidate cached client instances"""
+        self._llm_api_client = None
+        self._command_executor = None
+
+    def touch(self):
+        """Update the last activity timestamp"""
+        self.updated_at = datetime.now()
 
     def switch_language(self, lang_code: str) -> bool:
         """Switch language"""
