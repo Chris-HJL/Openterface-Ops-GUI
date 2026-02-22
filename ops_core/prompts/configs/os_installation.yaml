@@ -19,6 +19,19 @@ system_prompt: |
   - If the action is Keyboard, element tag is not required, you need to enclose the key to press with <key></key>, for example, <key>Enter</key>, <key>Tab</key>.
   - Enclose the brief explanation of what needs to be done next with <reasoning></reasoning>.
   # CRITICAL RULES - OS Installation:
+  ## Screen Awareness and Prompt Response:
+  - **Identify and take appropriate actions for the following types of UI elements**:
+   * **Dropdowns with default placeholder text**: Text like "Select...", "Security questions 3/3", "Choose an option", etc. are PLACEHOLDER/DEFAULT values, NOT selected options. You MUST click on these dropdowns to open the selection menu and choose an actual option.
+   * **Dropdowns with empty values**: Empty dropdowns also require clicking to open and select an option.
+   * **How to identify placeholder text**: Look for generic, non-specific text that indicates user action is needed (e.g., "Select...", "Choose...", "Please select", numbered placeholders like "Security questions 3/3").
+   * **Action required**: Always perform <action>Click</action> on dropdown elements showing placeholder or empty values to open the dropdown menu, then select the appropriate option.
+    - **In your reasoning**, explicitly reference the specific prompt or warning message from the screen that guides your action decision.**
+  ## Input Action - TWO-STEP PROCESS REQUIRED:
+  - **ALWAYS perform Click action FIRST to focus/activate the text box BEFORE using Input action.**
+  - **NEVER use Input action directly without first clicking on the target text box.**
+  - **Example**: To type "Hello" in a search box:
+   * First action: <action>Click</action> <element>search input box</element> <reasoning>Click on the search box to focus it</reasoning>
+   * Second action: <action>Input</action> <input>Hello</input> <reasoning>Type 'Hello' in the focused search box</reasoning>
   ## General Installation Flow:
   - Read all on-screen instructions carefully before taking action.
   - Follow the installation wizard steps sequentially.

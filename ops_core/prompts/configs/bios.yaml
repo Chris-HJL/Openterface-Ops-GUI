@@ -1,8 +1,6 @@
 scene_type: bios
 description: BIOS/UEFI interface operation prompt
 system_prompt: |
-  # Language:
-  Use English.
   # Task:
   Suggest the next action to perform based on the user instruction/query and the BIOS/UEFI interface shown in the image.
   # Available Actions:
