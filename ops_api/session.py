@@ -1,10 +1,11 @@
 """
 Session management module
 """
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Union
 from datetime import datetime
 from ops_core import Translator, DocumentRetriever, ImageServerClient, LLMAPIClient
 from ops_core.ui_operations import CommandExecutor
+from ops_core.prompts import SceneType
 from config import Config
 from .react_memory import ReActMemory, ReActMemoryStore
 
@@ -19,6 +20,10 @@ class Session:
         self.translator = Translator(self.current_language)
         self.retriever: Optional[DocumentRetriever] = None
         self.rag_enabled = False
+        # Scene type for prompt selection
+        self.scene_type: SceneType = SceneType.AUTO
+        # Cached detected scene for ReAct mode (detected once per task)
+        self.react_detected_scene: Optional[SceneType] = None
         # API configuration
         self.api_url = Config.DEFAULT_API_URL
         self.model = Config.DEFAULT_MODEL
@@ -89,6 +94,24 @@ class Session:
             self.current_language = lang_code
             return True
         return False
+
+    def switch_scene(self, scene_type: Union[SceneType, str]) -> bool:
+        """
+        Switch scene type
+        
+        Args:
+            scene_type: SceneType enum or string value
+            
+        Returns:
+            True if switch was successful
+        """
+        try:
+            if isinstance(scene_type, str):
+                scene_type = SceneType(scene_type.lower())
+            self.scene_type = scene_type
+            return True
+        except ValueError:
+            return False
 
     def clear_history(self):
         """Clear conversation history"""

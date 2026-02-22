@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 from ops_core import (
     ResponseParser
 )
+from ops_core.prompts import SceneType
 from ops_api.react_context import ReActContextBuilder
 from ops_api.react_memory import IterationRecord
 from config import Config
@@ -317,6 +318,8 @@ class ReActTaskManager:
             return
 
         task.status = "running"
+        # Clear cached detected scene for new task
+        task.session.react_detected_scene = None
         logger.info(f"[TaskManager] Starting task {task_id}")
 
         # Execute task in background
@@ -425,6 +428,18 @@ class ReActTaskManager:
 
                 logger.info(f"[TaskManager] Got image: {image_path}")
 
+                # Determine scene type for this iteration
+                # Only detect scene once at the first iteration when scene_type is AUTO
+                effective_scene_type = task.session.scene_type
+                if task.session.scene_type == SceneType.AUTO:
+                    if iteration_num == 1:
+                        logger.info(f"[TaskManager] First iteration with AUTO scene, detecting scene...")
+                        from ops_core.prompts import SceneDetector
+                        detector = SceneDetector(task.session.api_url, task.session.model)
+                        task.session.react_detected_scene = detector.detect(image_path)
+                        logger.info(f"[TaskManager] Detected scene: {task.session.react_detected_scene.value}")
+                    effective_scene_type = task.session.react_detected_scene or SceneType.GENERAL
+
                 # Build prompt
                 base_prompt = task.task_description
 
@@ -440,7 +455,8 @@ class ReActTaskManager:
                     enhanced_prompt,
                     image_path=image_path,
                     retrieved_docs=task.session.retriever.retrieve(enhanced_prompt)
-                    if rag_enabled and task.session.retriever else None
+                    if rag_enabled and task.session.retriever else None,
+                    scene_type=effective_scene_type
                 )
 
                 logger.info(f"[TaskManager] LLM Response: {response[:200]}...")

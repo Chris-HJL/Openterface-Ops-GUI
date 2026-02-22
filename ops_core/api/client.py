@@ -3,9 +3,13 @@ API client module
 """
 import requests
 import os
-from typing import Optional, List, Dict, Any
+import logging
+from typing import Optional, List, Dict, Any, Union
 from config import Config
 from ..image.encoder import ImageEncoder
+from ..prompts import PromptRegistry, SceneType, SceneDetector
+
+logger = logging.getLogger(__name__)
 
 class LLMAPIClient:
     """LLM API client class"""
@@ -35,7 +39,8 @@ class LLMAPIClient:
         image_path: Optional[str] = None,
         history: Optional[List[Dict[str, Any]]] = None,
         retrieved_docs: Optional[List[str]] = None,
-        system_prompt: Optional[str] = None
+        system_prompt: Optional[str] = None,
+        scene_type: Optional[Union[SceneType, str]] = None
     ) -> str:
         """
         Get API response
@@ -45,7 +50,8 @@ class LLMAPIClient:
             image_path: Image file path
             history: Conversation history
             retrieved_docs: Retrieved documents
-            system_prompt: System prompt
+            system_prompt: System prompt (overrides scene_type if provided)
+            scene_type: Scene type for prompt selection (SceneType enum or string)
 
         Returns:
             API response text
@@ -74,64 +80,31 @@ class LLMAPIClient:
                         {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{ImageEncoder.encode_to_base64(image_path)}"}}
                     ]
                 })
-                # Add system prompt
-                if system_prompt:
-                    messages.append({
-                        "role": "system",
-                        "content": system_prompt
-                    })
-                else:
-                    messages.append({
-                        "role": "system",
-                        "content": """
-                            # Language:
-                                Use English.
-                            # Task:
-                                Suggest the next action to perform based on the user instruction/query and the UI elements shown in the image.
-                            # Available Actions:
-                                - Click
-                                - Double Click
-                                - Right Click
-                                - Input
-                                - Keyboard
-                            # Output Format:
-                                - Enclose your response with <Answer>Your response</Answer>.
-                                - Enclose the action to perform with <action></action>, for example, <action>Click</action>, <action>Keyboard</action>.
-                                - If the action is Click or Double Click or Right Click, enclose the name of the UI element with <element></element>, with brief description (element type, color, position, etc.) of the element, for example, <element>browser icon looks like 'e' in the taskbar</element>.
-                                - If the action is Input, element tag is not required, you need to trigger a focus/activate event on the text box first by clicking on it, then enclose the text (English only) to input with <input></input>, for example, <input>Hello World</input>.
-                                - If the action is Keyboard, element tag is not required, you need to enclose the key to press with <key></key>, for example, <key>Left</key>, <key>Enter</key>.
-                                - Enclose the brief explanation of what needs to be done next with <reasoning></reasoning>, for example, <reasoning>Click the OK Button to confirm</reasoning>.
-                            # CRITICAL RULES - MUST FOLLOW:
-                                ## Screen Awareness and Prompt Response:
-                                    - **Identify and take appropriate actions for the following types of UI elements**:
-                                        * **Dropdowns with default placeholder text**: Text like "Select...", "Security questions 3/3", "Choose an option", etc. are PLACEHOLDER/DEFAULT values, NOT selected options. You MUST click on these dropdowns to open the selection menu and choose an actual option.
-                                        * **Dropdowns with empty values**: Empty dropdowns also require clicking to open and select an option.
-                                        * **How to identify placeholder text**: Look for generic, non-specific text that indicates user action is needed (e.g., "Select...", "Choose...", "Please select", numbered placeholders like "Security questions 3/3").
-                                        * **Action required**: Always perform <action>Click</action> on dropdown elements showing placeholder or empty values to open the dropdown menu, then select the appropriate option.
-                                    - **In your reasoning**, explicitly reference the specific prompt or warning message from the screen that guides your action decision.**
-                                ## Clearing Text Box:
-                                    - **ALWAYS double-click the text box first to select all text, then use Backspace or Delete key to clear the text.**
-                                ## Input Action - TWO-STEP PROCESS REQUIRED:
-                                    - **ALWAYS perform Click action FIRST to focus/activate the text box BEFORE using Input action.**
-                                    - NEVER use Input action directly without first clicking on the target text box.
-                                    - Example: To type "Hello" in a search box:
-                                        * First action: <action>Click</action> <element>search input box</element> <reasoning>Click on the search box to focus it</reasoning>
-                                        * Second action: <action>Input</action> <input>Hello</input> <reasoning>Type 'Hello' in the focused search box</reasoning>
-                                ## BIOS Operation:
-                                    - Only use Keyboard action, unless there is a mouse cursor shown in the image.
-                                    - When only one menu/tab/screen is visible, for example, the 'chipset' screen, and the item desired is not in the current screen, use <key>Esc</key> to exit current screen and back to screen selection.
-                                    - Usually <key>Enter</key> is used to expand or confirm or select an item.
-                                    - Navigate to the desired item before using <key>Enter</key> to select/expand it.
-                                ## Windows and Linux with GUI Operation:
-                                    - In order to open an application with the icon is on desktop or in a folder window, use <action>Double Click</action> on the icon. If it is in Start Menu or Taskbar, use <action>Click</action> on the icon.
-                                    - In Windows, copy and paste actions are better to be performed with right-click context menu. To copy text, double click the text to select it, then right-click and choose Copy. To paste text, right-click in the desired location and choose Paste.
-                                    - To scroll up or down, use <action>Keyboard</action> with <key>PgUp</key> or <key>PgDn</key> key.
-                                    - Read instructions on the screen, fill in the required information before next step.
-                                    - Windows OS installation:
-                                       * Before installation, when you are required to select the drive/partition to install Windows, format the drive/partition before installation even if its capacity is sufficient.
-                                       * When the screen displays something like 'press any key to boot from USB', don't press any key, just wait for the computer to boot normally, then continue with Windows installation.
-                        """
-                    })
+                # Determine system prompt
+                final_system_prompt = system_prompt
+                if not final_system_prompt:
+                    registry = PromptRegistry.get_instance()
+                    if scene_type:
+                        if isinstance(scene_type, str):
+                            scene_type = SceneType(scene_type.lower())
+                        
+                        if scene_type == SceneType.AUTO:
+                            logger.info(f"[LLMAPIClient] Scene type is AUTO, detecting scene from image...")
+                            detector = SceneDetector(self.api_url, self.model, self.api_key)
+                            detected_scene = detector.detect(image_path)
+                            logger.info(f"[LLMAPIClient] Detected scene: {detected_scene.value}")
+                            final_system_prompt = registry.get(detected_scene)
+                        else:
+                            logger.info(f"[LLMAPIClient] Using scene type: {scene_type.value}")
+                            final_system_prompt = registry.get(scene_type)
+                    else:
+                        logger.info(f"[LLMAPIClient] No scene type specified, using GENERAL")
+                        final_system_prompt = registry.get(SceneType.GENERAL)
+                
+                messages.append({
+                    "role": "system",
+                    "content": final_system_prompt
+                })
             else:
                 messages.append({
                     "role": "user",

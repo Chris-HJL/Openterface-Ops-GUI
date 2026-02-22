@@ -648,6 +648,31 @@ async def switch_language_api(request: SwitchLangRequest):
         success=False
     )
 
+@router.post("/switch-scene", response_model=SceneResponse)
+async def switch_scene_api(request: SwitchSceneRequest):
+    """Switch scene type for prompt selection"""
+    from ops_core.prompts import SceneType
+    
+    session = session_manager.get_session(request.session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    valid_scenes = [s.value for s in SceneType]
+    if request.scene_type.lower() in valid_scenes:
+        if session.switch_scene(request.scene_type):
+            logger.info(f"[Scene] Session {request.session_id}: Scene switched to {request.scene_type.lower()}")
+            return SceneResponse(
+                message="Scene switched successfully",
+                current_scene=request.scene_type.lower(),
+                success=True
+            )
+    logger.warning(f"[Scene] Session {request.session_id}: Invalid scene type '{request.scene_type}'")
+    return SceneResponse(
+        message=f"Invalid scene type. Valid options: {valid_scenes}",
+        current_scene=session.scene_type.value,
+        success=False
+    )
+
 @router.post("/toggle-rag", response_model=ToggleResponse)
 async def toggle_rag(request: ToggleRequest):
     """Toggle RAG functionality"""
@@ -768,6 +793,8 @@ async def react(request: ReactRequest):
     session.react_current_iteration = 0
     session.react_task_description = request.task
     session.react_is_running = True
+    # Clear cached detected scene for new task
+    session.react_detected_scene = None
 
     # Initialize memory
     session.initialize_react_memory(request.task)
@@ -818,6 +845,18 @@ async def react(request: ReactRequest):
                 )
             logger.info(f"[ReAct] Got image: {image_path}")
 
+            # Determine scene type for this iteration
+            # Only detect scene once at the first iteration when scene_type is AUTO
+            effective_scene_type = session.scene_type
+            if session.scene_type == SceneType.AUTO:
+                if iteration_num == 1:
+                    logger.info(f"[ReAct] First iteration with AUTO scene, detecting scene...")
+                    from ops_core.prompts import SceneDetector
+                    detector = SceneDetector(session.api_url, session.model)
+                    session.react_detected_scene = detector.detect(image_path)
+                    logger.info(f"[ReAct] Detected scene: {session.react_detected_scene.value}")
+                effective_scene_type = session.react_detected_scene or SceneType.GENERAL
+
             # Build base prompt
             base_prompt = session.react_task_description
 
@@ -830,7 +869,8 @@ async def react(request: ReactRequest):
             response = api_client.get_response(
                 enhanced_prompt,
                 image_path=image_path,
-                retrieved_docs=session.retriever.retrieve(enhanced_prompt) if rag_enabled and session.retriever else None
+                retrieved_docs=session.retriever.retrieve(enhanced_prompt) if rag_enabled and session.retriever else None,
+                scene_type=effective_scene_type
             )
             logger.info(f"[ReAct] LLM Response: {response[:200]}...")
 

@@ -29,6 +29,10 @@ class SwitchLangRequest(BaseModel):
     session_id: str
     lang_code: str
 
+class SwitchSceneRequest(BaseModel):
+    session_id: str
+    scene_type: str
+
 class ToggleRequest(BaseModel):
     session_id: str
     mode: Optional[bool] = None
@@ -120,6 +124,11 @@ class StatusResponse(BaseModel):
 class LangResponse(BaseModel):
     message: str
     current_lang: str
+    success: bool
+
+class SceneResponse(BaseModel):
+    message: str
+    current_scene: str
     success: bool
 
 class ToggleResponse(BaseModel):
