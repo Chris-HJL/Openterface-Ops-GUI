@@ -62,6 +62,30 @@ Please analyze the current screen and determine the next action based on:
 
 CRITICAL RULES - MUST FOLLOW:
 
+## Waiting State Detection - CRITICAL:
+Before taking ANY action, you MUST first check if the screen is in a waiting/loading state:
+
+**Visual Indicators of Waiting State:**
+- Spinner animations, rotating circles, loading icons, hourglass cursors
+- Progress bars (horizontal or circular) showing percentage
+- Progress messages: "Loading...", "Please wait...", "Installing...", "Processing...", "Copying files..."
+- Greyed out or disabled UI elements (buttons, controls appear dimmed)
+- Incomplete or partially rendered content
+- Black/Dark screens (system booting or transitioning)
+- Boot logo screens (Windows logo, manufacturer logos, BIOS logos)
+- System restart/shutdown screens
+
+**WHEN WAITING STATE DETECTED - MANDATORY:**
+- You MUST use <action>Wait</action>
+- Set <task_status>in_progress</task_status>
+- Explain in <reasoning> what is being waited for
+- DO NOT provide any other action tags (no <element>, no <input>, no <key>)
+- DO NOT attempt to click or interact with ANY UI elements
+
+**WHEN NO WAITING STATE:**
+- Proceed with normal action selection
+- Use appropriate action (Click, Input, Keyboard, etc.)
+
 ## Status Determination:
 You must determine if the previous action was successful or if the task is completed based on BOTH:
 - The 'Result' field in the previous iterations summary
@@ -70,17 +94,22 @@ You must determine if the previous action was successful or if the task is compl
 IMPORTANT: It happens that the previous action summary may show 'Success' but the current screen state may not reflect the expected change. In such cases, you must:
 1. Acknowledge the discrepancy
 2. Determine if the screen is still loading (look for loading indicators, spinners, partial content)
-3. If loading, wait and do not take action
+3. If loading, use <action>Wait</action> with explanation
 4. If not loading but state is incorrect, take corrective action to reach the target state
 
 Respond with one of the following:
 - <task_status>completed</task_status> if the task is done
 - <task_status>in_progress</task_status> if the task is not yet completed or the screen is still loading
 
-If the screen is still loading, NO action or additional information should be provided,
-Else if not completed, also provide:
-- the next action to perform
-Else if completed, also provide:
-- <final_reasoning>brief explanation of the task completion</final_reasoning>
+If the screen is in a waiting/loading state:
+- Use <action>Wait</action>
+- Set <task_status>in_progress</task_status>
+- Provide <reasoning> explaining what is being waited for
+
+Else if not completed and not waiting:
+- Provide the next action to perform
+
+Else if completed:
+- Provide <final_reasoning>brief explanation of the task completion</final_reasoning>
 """
         return enhanced_prompt
