@@ -66,23 +66,12 @@ class LLMAPIClient:
             # Build request body
             messages = []
 
-            # If there is conversation history, add history
-            if history is not None and len(history) > 0:
-                messages.extend(history)
-
-            # Add current user message
+            # Determine system prompt first (must be at the beginning for llama.cpp VLM)
+            final_system_prompt = None
             if image_path and os.path.exists(image_path):
-                # Add image content to message
-                messages.append({
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": enhanced_prompt},
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{ImageEncoder.encode_to_base64(image_path)}"}}
-                    ]
-                })
-                # Determine system prompt
-                final_system_prompt = system_prompt
-                if not final_system_prompt:
+                if system_prompt:
+                    final_system_prompt = system_prompt
+                else:
                     registry = PromptRegistry.get_instance()
                     if scene_type:
                         if isinstance(scene_type, str):
@@ -100,10 +89,27 @@ class LLMAPIClient:
                     else:
                         logger.info(f"[LLMAPIClient] No scene type specified, using GENERAL")
                         final_system_prompt = registry.get(SceneType.GENERAL)
-                
+
+            # Add system message at the beginning if available
+            if final_system_prompt:
                 messages.append({
                     "role": "system",
                     "content": final_system_prompt
+                })
+
+            # If there is conversation history, add history
+            if history is not None and len(history) > 0:
+                messages.extend(history)
+
+            # Add current user message
+            if image_path and os.path.exists(image_path):
+                # Add image content to message
+                messages.append({
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": enhanced_prompt},
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{ImageEncoder.encode_to_base64(image_path)}"}}
+                    ]
                 })
             else:
                 messages.append({
