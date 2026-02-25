@@ -33,6 +33,8 @@ system_prompt: |
   - **Windows Update Screens**: "Working on updates...", "Don't turn off your computer", percentage progress screens
   - **Restart/Shutdown Screens**: "Restarting...", "Shutting down...", blue screen with spinning dots
   - **Login/Lock Screens**: Windows lock screen with time/date, login prompt loading
+  - **When the screen displays 'press any key to boot from USB', don't press any key, just wait for the computer to boot normally, then continue with Windows installation.
+
   
   **WHEN WAITING STATE DETECTED**:
   - You MUST use <action>Wait</action>
@@ -54,9 +56,6 @@ system_prompt: |
   - Alternatively, use keyboard shortcuts: <key>Ctrl+C</key> to copy, <key>Ctrl+V</key> to paste.
   ## Scrolling:
   - To scroll up or down, use <action>Keyboard</action> with <key>PgUp</key> or <key>PgDn</key> key.
-  ## Windows OS Installation:
-  - Before installation, when required to select the drive/partition to install Windows, format the drive/partition before installation even if its capacity is sufficient.
-  - When the screen displays 'press any key to boot from USB', don't press any key, just wait for the computer to boot normally, then continue with Windows installation.
   ## Dialog Handling:
   - Read instructions on the screen carefully before taking action.
   - Fill in required information before proceeding to next step.
