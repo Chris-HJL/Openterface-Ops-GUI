@@ -13,9 +13,10 @@ from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import json
 import urllib.parse
+import base64
 
 # Global variable to store current image path
-current_image_path = r"images/4a.jpg"
+current_image_path = r"./images/test_screen.jpg"
 image_path_lock = threading.Lock()
 
 
@@ -36,23 +37,101 @@ def read_image_file(file_path):
         print(f"Error reading image file: {e}")
         return None
 
+def handle_gettargetscreen(client_socket):
+    """
+    Handle gettargetscreen command - returns JSON with Base64 encoded image
+
+    注意：此模拟器实现从文件读取图像并返回 Base64 编码。
+    真实 Openterface 设备会返回实时捕获的视频帧。
+    """
+    global current_image_path
+
+    # Use global image path
+    with image_path_lock:
+        image_path = current_image_path
+
+    # Check if image file exists
+    if not os.path.exists(image_path):
+        error_response = {
+            "type": "error",
+            "status": "error",
+            "timestamp": datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "message": f"Image file does not exist: {image_path}"
+        }
+        client_socket.send(json.dumps(error_response).encode('utf-8'))
+        print(f"❌ {error_response['message']}")
+        return
+
+    # Read image file
+    image_data = read_image_file(image_path)
+    if image_data is None:
+        error_response = {
+            "type": "error",
+            "status": "error",
+            "timestamp": datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "message": "Failed to read image file"
+        }
+        client_socket.send(json.dumps(error_response).encode('utf-8'))
+        print(f"❌ {error_response['message']}")
+        return
+
+    # Encode to Base64
+    base64_content = base64.b64encode(image_data).decode('utf-8')
+
+    # Simulate resolution info (read actual image size if possible)
+    try:
+        from PIL import Image
+        with Image.open(image_path) as img:
+            width, height = img.size
+    except:
+        width, height = 1920, 1080  # Default simulated values
+
+    # Create successful response
+    response = {
+        "type": "screen",
+        "status": "success",
+        "timestamp": datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "data": {
+            "size": len(base64_content),
+            "width": width,
+            "height": height,
+            "format": "jpeg",
+            "encoding": "base64",
+            "content": base64_content
+        }
+    }
+
+    # Send JSON response
+    response_json = json.dumps(response)
+    client_socket.send(response_json.encode('utf-8'))
+
+    print(f"📤 gettargetscreen response sent")
+    print(f"   Size: {len(base64_content)} bytes (Base64)")
+    print(f"   Resolution: {width}x{height}")
+    print(f"   Image: {image_path}")
+
+
 def handle_client(client_socket, address):
     """
-    Handle client connections
-    
+    Handle client connections - now supports both commands
+
     Args:
         client_socket: Client socket connection
         address: Client address
     """
     print(f"✅ Client {address} connected")
-    
+
     try:
         # Receive command from client
         command = client_socket.recv(1024).decode('utf-8', errors='ignore').strip()
         print(f"📥 Received command: {command}")
-        
-        # Only handle lastimage command
-        if command.lower() == "lastimage":
+
+        # Handle gettargetscreen command (NEW)
+        if command.lower() == "gettargetscreen":
+            handle_gettargetscreen(client_socket)
+
+        # Handle lastimage command (EXISTING)
+        elif command.lower() == "lastimage":
             # Use global image path
             with image_path_lock:
                 image_path = current_image_path
@@ -239,7 +318,8 @@ def start_server(host='localhost', port=12345, stop_event=None):
         server_socket.bind((host, port))
         server_socket.listen(5)
         print(f"🚀 Server started at {host}:{port}")
-        print("🔧 Only handles lastimage command")
+        print("🔧 Handles lastimage command")
+        print("🔧 Now also supports gettargetscreen command")
         print("⏳ Waiting for client connections...")
         print("💡 Please use client to connect and test")
         

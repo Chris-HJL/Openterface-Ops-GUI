@@ -43,6 +43,7 @@ Openterface-Ops-GUI/
 │       ├── parser.py       # Response parser
 │       ├── ui_ins_client.py # UI-Ins client
 │       └── checkbox_detector.py # Checkbox detection
+│   └── coord_converter.py  # Coordinate conversion (pixel ↔ HID)
 ├── i18n/                   # Translation files
 │   ├── en.json             # English translations
 │   └── zh.json             # Chinese translations
@@ -54,6 +55,7 @@ Openterface-Ops-GUI/
 - **Chat Interface**: Interactive chat with AI models
 - **Image Capture**: Get and display the latest screen image from TCP server
 - **UI Element Detection**: Identify and interact with UI elements using UI-Model
+- **Coordinate Conversion**: Automatic conversion between pixel and HID coordinates for accurate clicking
 - **ReAct Agent Mode**: Autonomous task execution with reasoning and acting cycles
 - **Approval System**: Manual, auto, or strict approval policies for dangerous operations
 - **Multi-turn Conversations**: Maintain conversation context across multiple messages
@@ -129,6 +131,53 @@ API keys for the models are set through environment variables:
 | `RAG_DOCS_DIR` | ./docs | Documents directory for RAG |
 | `RAG_INDEX_DIR` | ./index | Index storage directory |
 | `MAX_REACT_ITERATIONS` | 20 | Maximum ReAct agent iterations |
+
+#### Coordinate Conversion
+
+The system **automatically detects screen resolution from screenshots** and converts pixel coordinates (from UI-Model) to HID coordinates (for Openterface KVM) to ensure accurate clicking.
+
+- ✅ **Zero Configuration**: Works with any resolution out of the box
+- ✅ **Automatic Detection**: Reads resolution directly from screen capture
+- ✅ **Fallback Configuration**: Can set SCREEN_WIDTH/SCREEN_HEIGHT if needed
+
+For detailed configuration options, see the Configuration section below.
+
+## Configuration
+
+### Screen Resolution (Optional)
+
+**✨ Zero Configuration (Recommended)**: The system automatically detects screen resolution from screenshots.
+
+Just start the application and it works seamlessly with any screen resolution!
+
+**Fallback Configuration** (only if automatic detection fails):
+
+You can configure the screen resolution through environment variables:
+
+```bash
+# Windows (PowerShell)
+$env:SCREEN_WIDTH="1920"
+$env:SCREEN_HEIGHT="1080"
+
+# Linux/Mac
+export SCREEN_WIDTH=1920
+export SCREEN_HEIGHT=1080
+```
+
+**Default**: 1920×1080
+
+**Supported Resolutions**:
+
+| Resolution | Width | Height |
+|------------|-------|--------|
+| HD | 1280 | 720 |
+| FHD (Default) | 1920 | 1080 |
+| 2K | 2560 | 1440 |
+| 4K | 3840 | 2160 |
+
+The coordinate conversion feature automatically handles all resolutions.
+
+For detailed information, see [COORDINATE_CONVERSION.md](./COORDINATE_CONVERSION.md) and [QUICKSTART_COORDINATE.md](./QUICKSTART_COORDINATE.md)
 
 ## Usage
 

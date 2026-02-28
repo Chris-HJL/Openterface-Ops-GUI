@@ -10,6 +10,7 @@ from .ui_ins_client import UIInsClient
 from .checkbox_detector import CheckboxDetector
 from ..image.drawer import ImageDrawer
 from ..image_server.client import ImageServerClient
+from ..coord_converter import CoordinateConverter
 
 class CommandExecutor:
     """Command executor class"""
@@ -27,6 +28,8 @@ class CommandExecutor:
         self.image_server_client = ImageServerClient()
         self.parser = ResponseParser()
         self.checkbox_detector = CheckboxDetector()
+        # Coordinate converter - resolution will be loaded from images dynamically
+        self.coord_converter = CoordinateConverter()
 
     def _is_checkbox_element(self, element: str) -> bool:
         """
@@ -100,23 +103,37 @@ class CommandExecutor:
                 ui_model_response = self.ui_ins_client.call_api(image_path, element)
                 print(f"UI-Model Response: {ui_model_response}")
 
-                point_x, point_y = self.parser.parse_coordinates(ui_model_response)
+                # Parse pixel coordinates from UI-Model
+                pixel_x, pixel_y = self.parser.parse_coordinates(ui_model_response)
 
-                if point_x != -1:
+                if pixel_x != -1:
+                    # ✨ Load resolution from image before coordinate conversion
+                    self.coord_converter.load_resolution_from_image(image_path)
+
+                    # Refine checkbox coordinates if needed (still in pixel coordinates)
                     if self._is_checkbox_element(element):
-                        point_x, point_y = self._refine_checkbox_coordinates(
-                            image_path, point_x, point_y
+                        pixel_x, pixel_y = self._refine_checkbox_coordinates(
+                            image_path, pixel_x, pixel_y
                         )
+
+                    # Convert pixel coordinates to HID coordinates for TCP command
+                    hid_x, hid_y = self.coord_converter.pixel_to_hid(pixel_x, pixel_y)
+
+                    # Adjust HID coordinates to offset the impact of normalized coordinates
+                    hid_y -= 10
+
+                    print(f"[Executor] Coordinate conversion: pixel ({pixel_x}, {pixel_y}) -> HID ({hid_x}, {hid_y})")
 
                     base_name = os.path.basename(image_path)
                     name, ext = os.path.splitext(base_name)
                     output_path = os.path.join(Config.OUTPUT_DIR, f"{name}_ui_model{ext}")
 
+                    # Drawing on image uses pixel coordinates
                     box_size = 50
-                    left = point_x - box_size // 2
-                    top = point_y - box_size // 2
-                    right = point_x + box_size // 2
-                    bottom = point_y + box_size // 2
+                    left = pixel_x - box_size // 2
+                    top = pixel_y - box_size // 2
+                    right = pixel_x + box_size // 2
+                    bottom = pixel_y + box_size // 2
 
                     width, height = Image.open(image_path).size
                     left = max(0, left)
@@ -131,12 +148,13 @@ class CommandExecutor:
                         output_path
                     )
 
+                    # TCP command uses HID coordinates
                     if action == "Click":
-                        script_command = f'Send "{{Click {point_x}, {point_y}}}"'
+                        script_command = f'Send "{{Click {hid_x}, {hid_y}}}"'
                     elif action == "Double Click":
-                        script_command = f'Send "{{Click {point_x}, {point_y}}}"\nSend "{{Click {point_x}, {point_y}}}"'
+                        script_command = f'Send "{{Click {hid_x}, {hid_y}}}"\nSend "{{Click {hid_x}, {hid_y}}}"'
                     elif action == "Right Click":
-                        script_command = f'Send "{{Click {point_x}, {point_y} Right}}"'
+                        script_command = f'Send "{{Click {hid_x}, {hid_y} Right}}"'
                     else:
                         script_command = None
 

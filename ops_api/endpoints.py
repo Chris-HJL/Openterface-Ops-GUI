@@ -25,7 +25,7 @@ from ops_core import (
     APIConnectionTester,
     ResponseParser
 )
-from config import Config
+from config import Config, ScreenCaptureMode
 
 logging.basicConfig(
     level=logging.INFO,
@@ -206,8 +206,17 @@ async def chat(request: ChatRequest):
     elif request.get_image_from_server:
         logger.info("[Chat] Fetching image from server...")
         image_server_client = session.image_server_client
-        image_path = image_server_client.get_last_image()
-        if image_path and not image_path.startswith("./images"):
+        
+        # 根据配置模式获取屏幕图像
+        if Config.SCREEN_CAPTURE_MODE == ScreenCaptureMode.HYBRID:
+            image_path = image_server_client.get_screen_image()
+        elif Config.SCREEN_CAPTURE_MODE == ScreenCaptureMode.GETTARGETSCREEN:
+            image_path = image_server_client.get_target_screen()
+        else:  # LASTIMAGE
+            image_path = image_server_client.get_last_image()
+        
+        # 统一错误检查：处理 None、"Error:" 前缀和无效路径
+        if not image_path or image_path.startswith("Error:") or not image_path.startswith("./images"):
             logger.error(f"[Chat] Failed to get image from server: {image_path}")
             return ChatResponse(
                 response=f"Failed to get image from server: {image_path}",
@@ -739,8 +748,17 @@ async def get_image(request: GetImageRequest):
 
     # Get image from server using cached client
     image_server_client = session.image_server_client
-    image_path = image_server_client.get_last_image()
-    if image_path and not image_path.startswith("./images"):
+    
+    # 根据配置模式获取屏幕图像
+    if Config.SCREEN_CAPTURE_MODE == ScreenCaptureMode.HYBRID:
+        image_path = image_server_client.get_screen_image()
+    elif Config.SCREEN_CAPTURE_MODE == ScreenCaptureMode.GETTARGETSCREEN:
+        image_path = image_server_client.get_target_screen()
+    else:  # LASTIMAGE
+        image_path = image_server_client.get_last_image()
+    
+    # 统一错误检查
+    if not image_path or image_path.startswith("Error:") or not image_path.startswith("./images"):
         return GetImageResponse(
             image="",
             message=f"Failed to get image from server: {image_path}",
@@ -819,10 +837,19 @@ async def react(request: ReactRequest):
             # Fetch latest image from server using cached client
             logger.info(f"[ReAct] Fetching image from server for iteration {iteration_num}")
             image_server_client = session.image_server_client
-            image_path = image_server_client.get_last_image()
-            if image_path and not image_path.startswith("./images"):
+            
+            # 根据配置模式获取屏幕图像
+            if Config.SCREEN_CAPTURE_MODE == ScreenCaptureMode.HYBRID:
+                image_path = image_server_client.get_screen_image()
+            elif Config.SCREEN_CAPTURE_MODE == ScreenCaptureMode.GETTARGETSCREEN:
+                image_path = image_server_client.get_target_screen()
+            else:  # LASTIMAGE
+                image_path = image_server_client.get_last_image()
+            
+            # 统一错误检查：处理 None、"Error:" 前缀和无效路径
+            if not image_path or image_path.startswith("Error:") or not image_path.startswith("./images"):
                 logger.error(f"[ReAct] Failed to get image from server: {image_path}")
-                
+
                 # Log failed iteration
                 iteration_record = IterationRecord(
                     iteration_number=iteration_num,
@@ -835,7 +862,7 @@ async def react(request: ReactRequest):
                     task_status="error"
                 )
                 session.react_memory_store.add_iteration(session.session_id, iteration_record)
-                
+
                 return ReactResponse(
                     message=f"Failed to get image from server: {image_path}",
                     iterations_completed=iteration_num - 1,
