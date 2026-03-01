@@ -16,7 +16,7 @@ from ops_core import (
 from ops_core.prompts import SceneType
 from ops_api.react_context import ReActContextBuilder
 from ops_api.react_memory import IterationRecord
-from config import Config, ScreenCaptureMode
+from config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -413,15 +413,10 @@ class ReActTaskManager:
                 logger.info(f"[TaskManager] Iteration {iteration_num}/{task.max_iterations}")
 
                 # Fetch latest image from server using cached client
-                # 根据配置模式获取屏幕图像
-                if Config.SCREEN_CAPTURE_MODE == ScreenCaptureMode.HYBRID:
-                    image_path = image_server_client.get_screen_image()
-                elif Config.SCREEN_CAPTURE_MODE == ScreenCaptureMode.GETTARGETSCREEN:
-                    image_path = image_server_client.get_target_screen()
-                else:  # LASTIMAGE
-                    image_path = image_server_client.get_last_image()
-                
-                # 统一错误检查：处理 None、"Error:" 前缀和无效路径
+                # 使用 gettargetscreen 命令获取屏幕图像
+                image_path = image_server_client.get_target_screen()
+
+                # 错误检查
                 if not image_path or image_path.startswith("Error:") or not image_path.startswith("./images"):
                     logger.error(f"[TaskManager] Failed to get image: {image_path}")
                     task.error(f"Failed to get image from server: {image_path}")

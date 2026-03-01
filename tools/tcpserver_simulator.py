@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """
 Openterface Server Simulator
-Simulates the TCP server in the server module, handling lastImage commands
+Simulates the TCP server in the server module, handling gettargetscreen commands
 Supports updating image paths via HTTP interface
+
+注意：已完全迁移到 gettargetscreen 命令，不再支持 lastimage 命令。
 """
 
 import socket
@@ -113,7 +115,7 @@ def handle_gettargetscreen(client_socket):
 
 def handle_client(client_socket, address):
     """
-    Handle client connections - now supports both commands
+    Handle client connections - only supports gettargetscreen command
 
     Args:
         client_socket: Client socket connection
@@ -126,44 +128,15 @@ def handle_client(client_socket, address):
         command = client_socket.recv(1024).decode('utf-8', errors='ignore').strip()
         print(f"📥 Received command: {command}")
 
-        # Handle gettargetscreen command (NEW)
+        # Handle gettargetscreen command
         if command.lower() == "gettargetscreen":
             handle_gettargetscreen(client_socket)
-
-        # Handle lastimage command (EXISTING)
-        elif command.lower() == "lastimage":
-            # Use global image path
-            with image_path_lock:
-                image_path = current_image_path
-            
-            # Check if image file exists
-            if not os.path.exists(image_path):
-                error_msg = f"Image file does not exist: {image_path}"
-                client_socket.send(f"ERROR: {error_msg}\n".encode('utf-8'))
-                print(f"❌ {error_msg}")
-            else:
-                # Read image file
-                image_data = read_image_file(image_path)
-                if image_data is None:
-                    error_msg = "Failed to read image file"
-                    client_socket.send(f"ERROR: {error_msg}\n".encode('utf-8'))
-                    print(f"❌ {error_msg}")
-                else:
-                    # Send image data to client - using correct binary format
-                    image_size = len(image_data)
-                    # First send header information, ensure it ends with newline
-                    header = f"IMAGE:{image_size}\n"
-                    client_socket.send(header.encode('utf-8'))
-                    # Then send image data - ensure it's complete binary data
-                    client_socket.send(image_data)
-                    print(f"📤 Image sent, size: {image_size} bytes")
-                    print(f"✅ Image transfer completed")
         else:
             # Unsupported command
-            error_msg = f"Unsupported command: {command}"
+            error_msg = f"Unsupported command: {command} (only 'gettargetscreen' is supported)"
             client_socket.send(f"ERROR: {error_msg}\n".encode('utf-8'))
             print(f"❌ {error_msg}")
-            
+
     except Exception as e:
         print(f"Error handling client request: {e}")
         import traceback
