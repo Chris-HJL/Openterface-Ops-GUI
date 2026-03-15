@@ -5,6 +5,7 @@ from typing import Dict, Any, Optional, List, Union
 from datetime import datetime
 from ops_core import Translator, DocumentRetriever, ImageServerClient, LLMAPIClient
 from ops_core.ui_operations import CommandExecutor
+from ops_core.ui_operations.ui_ins_client import UIInsClient
 from ops_core.prompts import SceneType
 from config import Config
 from .react_memory import ReActMemory, ReActMemoryStore
@@ -50,6 +51,7 @@ class Session:
         self._image_server_client: Optional[ImageServerClient] = None
         self._llm_api_client: Optional[LLMAPIClient] = None
         self._command_executor: Optional[CommandExecutor] = None
+        self._ui_ins_client: Optional[UIInsClient] = None
 
     @property
     def image_server_client(self) -> ImageServerClient:
@@ -79,10 +81,18 @@ class Session:
             )
         return self._command_executor
 
+    @property
+    def ui_ins_client(self) -> Optional[UIInsClient]:
+        """Get or create UIInsClient instance"""
+        if self._ui_ins_client is None:
+            self._ui_ins_client = UIInsClient(self.ui_model_api_url)
+        return self._ui_ins_client
+
     def invalidate_clients(self):
         """Invalidate cached client instances"""
         self._llm_api_client = None
         self._command_executor = None
+        self._ui_ins_client = None
 
     def touch(self):
         """Update the last activity timestamp"""

@@ -192,8 +192,12 @@ async def chat(request: ChatRequest):
     # Use session or requested model
     model = request.model or session.model
     rag_enabled = request.rag_enabled if request.rag_enabled is not None else session.rag_enabled
-
-    logger.info(f"[Chat] Model: {model}, RAG enabled: {rag_enabled}, Multiturn mode: {session.is_multiturn_mode}")
+    
+    # Update session scene type if provided in request
+    if request.scene_type:
+        session.switch_scene(request.scene_type)
+    
+    logger.info(f"[Chat] Model: {model}, RAG enabled: {rag_enabled}, Multiturn mode: {session.is_multiturn_mode}, Scene type: {session.scene_type}")
 
     # Get image path
     image_path = None
@@ -235,19 +239,22 @@ async def chat(request: ChatRequest):
 
     # Get API response
     logger.info(f"[Chat] Calling LLM API at {session.api_url}...")
+    logger.info(f"[Chat] Using scene type: {session.scene_type}")
     api_client = session.get_llm_api_client(model=model)
     if session.is_multiturn_mode:
         response = api_client.get_response(
             request.prompt,
             image_path=image_path,
             history=session.conversation_history,
-            retrieved_docs=retrieved_docs
+            retrieved_docs=retrieved_docs,
+            scene_type=session.scene_type
         )
     else:
         response = api_client.get_response(
             request.prompt,
             image_path=image_path,
-            retrieved_docs=retrieved_docs
+            retrieved_docs=retrieved_docs,
+            scene_type=session.scene_type
         )
     
     logger.info(f"[Chat] LLM Response: {response[:200]}...")
@@ -362,6 +369,12 @@ async def create_react_task(request: CreateReactTaskRequest):
         session.model = request.model
     if request.rag_enabled is not None:
         session.rag_enabled = request.rag_enabled
+    if request.scene_type:
+        logger.info(f"[ReAct Task] Received scene_type from frontend: '{request.scene_type}'")
+        session.switch_scene(request.scene_type)
+        logger.info(f"[ReAct Task] After switch_scene, session.scene_type = {session.scene_type} (value: {session.scene_type.value if hasattr(session.scene_type, 'value') else session.scene_type})")
+    else:
+        logger.info(f"[ReAct Task] No scene_type provided, using current: {session.scene_type}")
 
     # Create task
     task_id = await task_manager.create_task(
@@ -806,7 +819,7 @@ async def react(request: ReactRequest):
 
     # Initialize memory
     session.initialize_react_memory(request.task)
-    context_builder = ReActContextBuilder(session.react_memory, max_context_iterations=5)
+    context_builder = ReActContextBuilder(session.react_memory, max_context_iterations=10)
 
     # Use session or requested model and RAG settings
     model = request.model or session.model

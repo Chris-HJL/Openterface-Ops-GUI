@@ -19,6 +19,7 @@ class ChatRequest(BaseModel):
     model: Optional[str] = None
     rag_enabled: Optional[bool] = None
     get_image_from_server: Optional[bool] = False
+    scene_type: Optional[str] = None  # Scene type for prompt selection
 
 class BuildIndexRequest(BaseModel):
     session_id: str
@@ -60,6 +61,7 @@ class CreateReactTaskRequest(BaseModel):
     rag_enabled: Optional[bool] = None
     model: Optional[str] = None
     approval_policy: Optional[str] = "manual"
+    scene_type: Optional[str] = None  # Scene type for prompt selection
 
 class StopReactTaskRequest(BaseModel):
     task_id: str

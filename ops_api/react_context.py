@@ -3,7 +3,7 @@ from .react_memory import ReActMemory
 
 class ReActContextBuilder:
     
-    def __init__(self, memory: ReActMemory, max_context_iterations: int = 5):
+    def __init__(self, memory: ReActMemory, max_context_iterations: int = 10):
         self.memory = memory
         self.max_context_iterations = max_context_iterations
     

@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 from ops_core import (
     ResponseParser
 )
+from ops_core.ui_operations.executor import CommandExecutor, CommandBuilder
 from ops_core.prompts import SceneType
 from ops_api.react_context import ReActContextBuilder
 from ops_api.react_memory import IterationRecord
@@ -393,7 +394,7 @@ class ReActTaskManager:
             task.session.initialize_react_memory(task.task_description)
             context_builder = ReActContextBuilder(
                 task.session.react_memory,
-                max_context_iterations=3
+                max_context_iterations=10
             )
 
             # Use session model and RAG settings
@@ -427,6 +428,8 @@ class ReActTaskManager:
                 # Determine scene type for this iteration
                 # Only detect scene once at the first iteration when scene_type is AUTO
                 effective_scene_type = task.session.scene_type
+                logger.info(f"[TaskManager] Iteration {iteration_num}, session.scene_type = {task.session.scene_type} (value: {task.session.scene_type.value if hasattr(task.session.scene_type, 'value') else task.session.scene_type})")
+                
                 if task.session.scene_type == SceneType.AUTO:
                     if iteration_num == 1:
                         logger.info(f"[TaskManager] First iteration with AUTO scene, detecting scene...")
@@ -435,6 +438,9 @@ class ReActTaskManager:
                         task.session.react_detected_scene = detector.detect(image_path)
                         logger.info(f"[TaskManager] Detected scene: {task.session.react_detected_scene.value}")
                     effective_scene_type = task.session.react_detected_scene or SceneType.GENERAL
+                    logger.info(f"[TaskManager] Using effective_scene_type (detected): {effective_scene_type.value}")
+                else:
+                    logger.info(f"[TaskManager] Using user-selected scene_type: {effective_scene_type.value}")
 
                 # Build prompt
                 base_prompt = task.task_description
@@ -578,7 +584,37 @@ class ReActTaskManager:
                 execution_result = None
                 execution_error = None
 
-                if action in ["Click", "Double Click", "Right Click"] and element and image_path:
+                # Check if this is a Sequence operation
+                if action == "Sequence":
+                    logger.info(f"[TaskManager] Executing sequence operation")
+                    executor = task.session.get_command_executor()
+                    parser = ResponseParser()
+                    
+                    # Parse sequence operations from response
+                    sequence_ops = parser.parse_sequence_operations(response)
+                    
+                    if sequence_ops:
+                        logger.info(f"[TaskManager] Parsed {len(sequence_ops)} steps from sequence")
+                        
+                        # Build and execute command sequence
+                        success, result = executor.execute_sequence_operations(
+                            sequence_ops=sequence_ops,
+                            image_path=image_path,
+                            ui_ins_client=task.session.ui_ins_client
+                        )
+                        
+                        if success:
+                            logger.info(f"[TaskManager] Sequence execution successful: {result}")
+                            execution_success = True
+                            execution_result = str(result)
+                        else:
+                            logger.error(f"[TaskManager] Sequence execution failed: {result}")
+                            execution_error = str(result)
+                    else:
+                        logger.error(f"[TaskManager] No operations found in sequence")
+                        execution_error = "Failed to parse sequence operations"
+                
+                elif action in ["Click", "Double Click", "Right Click"] and element and image_path:
                     logger.info(f"[TaskManager] Executing {action} on {element}")
                     executor = task.session.get_command_executor()
                     success, result = executor.process_ui_element_request(
@@ -607,6 +643,30 @@ class ReActTaskManager:
                     logger.info(f"[TaskManager] Keyboard command sent successfully")
                     execution_success = True
                     execution_result = "Keyboard command sent successfully"
+                elif action == "Type" and input_content:
+                    # Handle Type action (new action type for text input)
+                    logger.info(f"[TaskManager] Sending Type action: {input_content}")
+                    executor = task.session.get_command_executor()
+                    success, result = executor.type_text(input_content)
+                    if success:
+                        logger.info(f"[TaskManager] Type action successful: {result}")
+                        execution_success = True
+                        execution_result = str(result)
+                    else:
+                        logger.error(f"[TaskManager] Type action failed: {result}")
+                        execution_error = str(result)
+                elif action == "Press" and key_content:
+                    # Handle Press action (new action type for keypress)
+                    logger.info(f"[TaskManager] Sending Press action: {key_content}")
+                    executor = task.session.get_command_executor()
+                    success, result = executor.press_key(key_content)
+                    if success:
+                        logger.info(f"[TaskManager] Press action successful: {result}")
+                        execution_success = True
+                        execution_result = str(result)
+                    else:
+                        logger.error(f"[TaskManager] Press action failed: {result}")
+                        execution_error = str(result)
 
                 # Update iteration record
                 iteration_record.execution_success = execution_success

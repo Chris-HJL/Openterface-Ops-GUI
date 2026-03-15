@@ -1067,6 +1067,9 @@ UI-Model API Status: ${data.ui_model_status}`;
                 document.getElementById('send-btn').disabled = true;
                 
                 try {
+                    // Get scene type from dropdown
+                    const sceneType = document.getElementById('scene-type').value;
+                    
                     // Create task
                     const createResponse = await fetch(`${API_BASE_URL}/react-task`, {
                         method: 'POST',
@@ -1077,7 +1080,8 @@ UI-Model API Status: ${data.ui_model_status}`;
                             session_id: sessionId,
                             task: task,
                             max_iterations: maxIterations,
-                            approval_policy: 'manual'
+                            approval_policy: 'manual',
+                            scene_type: sceneType
                         })
                     });
                     
@@ -1385,6 +1389,9 @@ UI-Model API Status: ${data.ui_model_status}`;
             const loadingMessage = addMessage('Thinking...', 'assistant');
             
             try {
+                // Get scene type from dropdown
+                const sceneType = document.getElementById('scene-type').value;
+                
                 // Send request, do not re-fetch image, use previously obtained image
                 const response = await fetch(`${API_BASE_URL}/chat`, {
                     method: 'POST',
@@ -1393,7 +1400,8 @@ UI-Model API Status: ${data.ui_model_status}`;
                     },
                     body: JSON.stringify({
                         session_id: sessionId,
-                        prompt: query
+                        prompt: query,
+                        scene_type: sceneType
                     })
                 });
                 

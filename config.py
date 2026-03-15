@@ -44,6 +44,40 @@ class Config:
     DEFAULT_LANGUAGE: str = "en"
     MAX_REACT_ITERATIONS: int = 20
 
+    # TCP 键鼠序列操作配置
+    COMMAND_SEQ_DELAY: float = 0.5  # 命令间默认延迟（秒）
+    COMMAND_SEQ_TIMEOUT: int = 30  # 序列执行超时（秒）
+
+    # 重试机制配置
+    MAX_RETRIES: int = 3  # 最大重试次数
+    RETRY_DELAY: float = 1.0  # 初始重试延迟（秒，会指数退避）
+    RETRY_BACKOFF_FACTOR: float = 2.0  # 指数退避因子（1s → 2s → 4s）
+
+    # 文本输入配置
+    MAX_TEXT_LENGTH_PER_COMMAND: int = 25  # 单个 Send 命令最大字符数
+    TEXT_CHUNK_DELAY: float = 0.3  # 文本块间延迟（秒）
+
+    # 状态检查配置
+    ENABLE_STATUS_CHECK: bool = True  # 是否启用命令状态检查
+    STATUS_CHECK_TIMEOUT: int = 5  # 状态检查超时（秒）
+
+    # 坐标转换配置
+    HID_COORD_MAX: int = 4096  # HID 坐标最大值（12 位）
+    DEFAULT_SCREEN_WIDTH: int = 1920  # 默认屏幕宽度（像素）
+    DEFAULT_SCREEN_HEIGHT: int = 1080  # 默认屏幕高度（像素）
+
+    # 操作延迟配置（可针对不同操作类型调整）
+    CLICK_DELAY: float = 0.3  # 点击后延迟
+    DOUBLE_CLICK_INTERVAL: float = 0.05  # 双击间隔（秒），典型双击速度 50ms
+    TYPE_DELAY: float = 0.5  # 文本输入后延迟
+    KEY_PRESS_DELAY: float = 0.3  # 按键后延迟
+    WAIT_DEFAULT: float = 1.0  # 默认等待时长
+
+    # 高级配置
+    BATCH_COMMAND_MAX_SIZE: int = 50  # 批量命令最大数量
+    ENABLE_COMMAND_OPTIMIZATION: bool = True  # 是否启用序列优化（合并等待等）
+    LOG_COMMAND_EXECUTION: bool = True  # 是否记录命令执行日志
+
     # 清理配置
     TASK_TTL_SECONDS: int = 3600
     SESSION_TTL_SECONDS: int = 7200
