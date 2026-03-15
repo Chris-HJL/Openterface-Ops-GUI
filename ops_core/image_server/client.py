@@ -261,10 +261,13 @@ class ImageServerClient:
             client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             client_socket.settimeout(10)
             client_socket.connect((self.host, self.port))
+            print(f"[ImageServerClient] Connected to {self.host}:{self.port}")
 
             for i, command in enumerate(commands):
                 # 发送命令（添加换行符，符合 TCP 服务器协议）
-                client_socket.send((command + '\n').encode('utf-8'))
+                full_cmd = command + '\n'
+                print(f"[ImageServerClient] Sending command [{i+1}/{len(commands)}]: {repr(full_cmd)}")
+                client_socket.send(full_cmd.encode('utf-8'))
 
                 # 短暂等待，让服务器处理
                 if not use_persistent_connection:
@@ -277,10 +280,16 @@ class ImageServerClient:
 
                 # 如果不是最后一个命令，等待延迟
                 if i < len(commands) - 1:
+                    print(f"[ImageServerClient] Waiting {delay}s before next command...")
                     time.sleep(delay)
+
+            # 等待最后一个命令执行完成后再关闭连接
+            print(f"[ImageServerClient] Waiting 0.5s for commands to complete...")
+            time.sleep(0.5)
 
             # 关闭连接
             client_socket.close()
+            print(f"[ImageServerClient] Connection closed")
 
             return True
 

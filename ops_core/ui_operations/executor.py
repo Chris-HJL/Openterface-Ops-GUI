@@ -165,6 +165,8 @@ class CommandExecutor:
                     if script_command:
                         if action == "Double Click":
                             commands = script_command.split('\n')
+                            print(f"[Executor] Double Click: sending {len(commands)} commands with delay={Config.DOUBLE_CLICK_INTERVAL}s")
+                            print(f"[Executor] Commands: {commands}")
                             self.image_server_client.send_command_sequence(
                                 commands, delay=Config.DOUBLE_CLICK_INTERVAL
                             )
@@ -215,6 +217,26 @@ class CommandExecutor:
         """
         if not sequence:
             return (True, "Command sequence is empty")
+
+        # 检查是否是双击操作（连续两个相同坐标的 Click 命令）
+        commands = [item.get("command", "") for item in sequence]
+        is_double_click = (
+            len(commands) == 2 and
+            commands[0].startswith("Click ") and
+            commands[0] == commands[1]
+        )
+
+        if is_double_click:
+            # 双击操作：使用持久连接发送命令序列
+            print(f"[Executor] Detected double-click, using persistent connection")
+            delays = [item.get("delay", 0.2) for item in sequence]
+            success = self.image_server_client.send_command_sequence(
+                commands, delay=delays[0]
+            )
+            if success:
+                return (True, "Double-click executed successfully")
+            else:
+                return (False, "Failed to execute double-click")
 
         results = []
 
@@ -617,8 +639,8 @@ class CommandBuilder:
 
         Note:
             双击通过发送两个独立的 Click 命令实现
-            两次点击之间有 0.2 秒延迟
-            使用独立 Click 命令（50ms 延迟）而非嵌入式（5ms 延迟）
+            两次点击之间的延迟由 Config.DOUBLE_CLICK_INTERVAL 控制（默认 50ms）
+            使用独立 Click 命令而非嵌入式
         """
         hid_x, hid_y = self.executor.coord_converter.pixel_to_hid(x, y)
 

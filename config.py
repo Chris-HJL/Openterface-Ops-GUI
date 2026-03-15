@@ -68,7 +68,7 @@ class Config:
 
     # 操作延迟配置（可针对不同操作类型调整）
     CLICK_DELAY: float = 0.3  # 点击后延迟
-    DOUBLE_CLICK_INTERVAL: float = 0.05  # 双击间隔（秒），典型双击速度 50ms
+    DOUBLE_CLICK_INTERVAL: float = 0.2  # 双击间隔（秒），200ms 符合 Windows 默认双击速度
     TYPE_DELAY: float = 0.5  # 文本输入后延迟
     KEY_PRESS_DELAY: float = 0.3  # 按键后延迟
     WAIT_DEFAULT: float = 1.0  # 默认等待时长
