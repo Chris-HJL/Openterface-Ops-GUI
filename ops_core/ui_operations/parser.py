@@ -244,9 +244,11 @@ class ResponseParser:
                 if element and ui_ins_client:
                     try:
                         ui_response = ui_ins_client.call_api(image_path, element)
-                        x, y = self.parse_coordinates(ui_response)
+                        norm_x, norm_y = self.parse_coordinates(ui_response)
 
-                        if x != -1:
+                        if norm_x != -1:
+                            # Convert normalized coordinates (0-1000) to pixel coordinates
+                            x, y = ui_ins_client.denormalize_coordinates(norm_x, norm_y, image_path)
                             click_op = {
                                 "type": op_type,
                                 "x": x,

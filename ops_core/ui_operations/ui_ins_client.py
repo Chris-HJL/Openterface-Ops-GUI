@@ -2,7 +2,8 @@
 UI-Ins API client module
 """
 import requests
-from typing import Optional
+from PIL import Image
+from typing import Optional, Tuple
 from config import Config
 from ..image.encoder import ImageEncoder
 
@@ -45,7 +46,7 @@ class UIInsClient:
                 {
                     "role":"system",
                     # "content": "Provide the coordinate of the element in the screenshot. The coordinate should be in the format of [x, y], enclosed in square brackets."
-                    "content": "Locate the UI element specified by the user instruction and provide the coordinate in the format of [x, y]."
+                    "content": "Locate the UI element specified by the user instruction and provide the coordinate in the format of [x, y], only the coordinate of the center of the element."
                 },
                 {
                     "role": "user",
@@ -58,7 +59,7 @@ class UIInsClient:
 
             payload = {
                 "messages": messages,
-                "max_tokens": 1000,
+                "max_tokens": 2000,
                 "model": self.model
             }
 
@@ -96,3 +97,24 @@ class UIInsClient:
             return "Connection error"
         except Exception as e:
             return f"Error occurred: {str(e)}"
+
+    @staticmethod
+    def denormalize_coordinates(
+        norm_x: int, norm_y: int, image_path: str
+    ) -> Tuple[int, int]:
+        """
+        Convert normalized coordinates (0-1000) to actual pixel coordinates
+
+        Args:
+            norm_x: Normalized x coordinate (0-1000)
+            norm_y: Normalized y coordinate (0-1000)
+            image_path: Path to the original image
+
+        Returns:
+            Tuple (pixel_x, pixel) in actual image coordinates
+        """
+        img = Image.open(image_path)
+        width, height = img.size
+        pixel_x = int(norm_x * width / 1000)
+        pixel_y = int(norm_y * height / 1000)
+        return (pixel_x, pixel_y)

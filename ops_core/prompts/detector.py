@@ -67,7 +67,7 @@ For example: <scene>bios</scene> or <scene>os_installation</scene>"""
 
             payload = {
                 "messages": messages,
-                "max_tokens": 1000,
+                "max_tokens": 2000,
                 "model": self.model,
             }
 

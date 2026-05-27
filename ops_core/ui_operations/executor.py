@@ -106,18 +106,22 @@ class CommandExecutor:
                 ui_model_response = self.ui_ins_client.call_api(image_path, element)
                 print(f"UI-Model Response: {ui_model_response}")
 
-                # Parse pixel coordinates from UI-Model
-                pixel_x, pixel_y = self.parser.parse_coordinates(ui_model_response)
+                # Parse normalized coordinates from UI-Model (0-1000 grid)
+                norm_x, norm_y = self.parser.parse_coordinates(ui_model_response)
 
-                if pixel_x != -1:
+                if norm_x != -1:
+                    # Convert normalized coordinates to actual pixel coordinates
+                    pixel_x, pixel_y = self.ui_ins_client.denormalize_coordinates(
+                        norm_x, norm_y, image_path
+                    )
                     # ✨ Load resolution from image before coordinate conversion
                     self.coord_converter.load_resolution_from_image(image_path)
 
                     # Refine checkbox coordinates if needed (still in pixel coordinates)
-                    if self._is_checkbox_element(element):
-                        pixel_x, pixel_y = self._refine_checkbox_coordinates(
-                            image_path, pixel_x, pixel_y
-                        )
+                    # if self._is_checkbox_element(element):
+                    #     pixel_x, pixel_y = self._refine_checkbox_coordinates(
+                    #         image_path, pixel_x, pixel_y
+                    #     )
 
                     # Convert pixel coordinates to HID coordinates for TCP command
                     hid_x, hid_y = self.coord_converter.pixel_to_hid(pixel_x, pixel_y)
@@ -476,9 +480,11 @@ class CommandExecutor:
                     try:
                         # 调用 UI-Model 获取坐标
                         ui_response = ui_ins_client.call_api(image_path, element)
-                        x, y = parser.parse_coordinates(ui_response)
+                        norm_x, norm_y = parser.parse_coordinates(ui_response)
 
-                        if x != -1:
+                        if norm_x != -1:
+                            # Convert normalized coordinates to pixel coordinates
+                            x, y = ui_ins_client.denormalize_coordinates(norm_x, norm_y, image_path)
                             op_type = "click" if action == "Click" else action.lower().replace(" ", "_")
                             operations.append({
                                 "type": op_type,
