@@ -101,3 +101,5 @@ system_prompt: |
   ## Status Determination:
   - <task_status>completed</task_status> when the OS installation is finished and the system is ready for use (desktop is visible and responsive).
   - <task_status>in_progress</task_status> when installation is ongoing, setup is incomplete, or system is rebooting during installation.
+  ## When NO progress after 2 or more attempts according to the context given:
+  - try some other actions, for example, if "input" action was used, but the text box didn't respond, try "click" action to focus/activate the text box first.

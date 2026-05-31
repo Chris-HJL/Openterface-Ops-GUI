@@ -126,6 +126,13 @@ class LLMAPIClient:
                 # "top_k": 20,
                 # "presence_penalty": 0.0,
                 # "repetition_penalty": 1.0,
+                # "chat_template_kwargs": {"enable_thinking": True}
+
+                "temperature": 0.7,
+                "top_p": 0.8,
+                "presence_penalty": 1.5,
+                "top_k": 20,
+                "chat_template_kwargs": {"enable_thinking": False},
             }
 
             # Send POST request
