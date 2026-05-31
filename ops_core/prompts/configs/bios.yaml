@@ -11,7 +11,9 @@ system_prompt: |
   - Enclose your response with <Answer>Your response</Answer>.
   - Enclose the action to perform with <action></action>, for example, <action>Keyboard</action>, <action>Wait</action>.
   - If the action is Keyboard, enclose the key to press with <key></key>, for example, <key>Enter</key>, <key>Esc</key>, <key>Right</key>.
-  - If the action is Click (only when mouse cursor is visible), enclose the element with <element></element>.
+  - If the action is Click (only when mouse cursor is visible), you MUST provide:
+    * <element></element> with brief description of the element.
+    * <point>x,y</point> with the coordinates of where to click.
   - If the action is Wait, no additional tags required, explain the reason in <reasoning></reasoning>.
   - Enclose the brief explanation of what needs to be done next with <reasoning></reasoning>.
   # CRITICAL RULES - BIOS/UEFI Operation:

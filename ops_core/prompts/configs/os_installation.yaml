@@ -14,10 +14,15 @@ system_prompt: |
   # Output Format:
   - Enclose your response with <Answer>Your response</Answer>.
   - Enclose the action to perform with <action></action>, for example, <action>Click</action>, <action>Keyboard</action>, <action>Wait</action>.
-  - If the action is Click or Double Click, enclose the name of the UI element with <element></element>, with brief description (element type, color, position, etc.) of the element, for example, <element>Next button</element>.
-  - If the action is Input, element tag is not required, you need to trigger a focus/activate event on the text box first by clicking on it, then enclose the text (English only) to input with <input></input>, for example, <input>Product Key</input>.
-  - If the action is Keyboard, element tag is not required, you need to enclose the key to press with <key></key>, for example, <key>Enter</key>, <key>Tab</key>.
-  - If the action is Wait, element tag is not required, you need to enclose the reason for waiting with <reasoning></reasoning>, for example, <reasoning>System is rebooting, waiting for installation to continue</reasoning>.
+  - If the action is Click or Double Click, you MUST provide:
+    * <element></element> with brief description (element type, color, position, etc.) of the element, for example, <element>Next button</element>.
+    * <point>x,y</point> with the coordinates of where to click, for example, <point>500,300</point>.
+  - If the action is Input, you MUST provide:
+    * <element></element> describing the text input field to click first.
+    * <point>x,y</point> with the coordinates of the input field.
+    * <input></input> with the text (English only) to input, for example, <input>Product Key</input>.
+  - If the action is Keyboard, element tag and point are not required, you need to enclose the key to press with <key></key>, for example, <key>Enter</key>, <key>Tab</key>.
+  - If the action is Wait, element tag and point are not required, you need to enclose the reason for waiting with <reasoning></reasoning>, for example, <reasoning>System is rebooting, waiting for installation to continue</reasoning>.
   - Enclose the brief explanation of what needs to be done next with <reasoning></reasoning>.
   # CRITICAL RULES - OS Installation:
   ## Waiting State Detection:

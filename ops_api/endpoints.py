@@ -277,38 +277,61 @@ async def chat(request: ChatRequest):
     # Check UI-Model request
     processed_image = None
     parser = ResponseParser()
-    action, element, input_content, key_content = parser.extract_action_and_element(response)
-    
-    logger.info(f"[Chat] Parsed action: {action}, element: {element}, input: {input_content}, key: {key_content}")
+    action, element, input_content, key_content, point_coords = parser.extract_action_and_element(response)
+
+    logger.info(f"[Chat] Parsed action: {action}, element: {element}, input: {input_content}, key: {key_content}, point: {point_coords}")
 
     if action in ["Click", "Double Click", "Right Click"] and element and image_path:
-        # Process UI-Model
-        logger.info(f"[Chat] Processing UI-Model request: {action} on {element}")
+        # Process click action using point coordinates from LLM
+        logger.info(f"[Chat] Processing click request: {action} on {element} at point {point_coords}")
         try:
             executor = session.get_command_executor()
-            logger.info(f"[Chat] Calling UI-Model API at {session.ui_model_api_url} with model {session.ui_model}")
-            success, result = executor.process_ui_element_request(
-                image_path, element, action, element
-            )
-
+            
+            # Use point coordinates from LLM if available
+            if point_coords:
+                success, result = executor.execute_click_at_point(
+                    image_path, action, point_coords
+                )
+            else:
+                # Fallback: use element description (should not happen with new model)
+                logger.warning(f"[Chat] No point coordinates provided, using element description fallback")
+                success, result = executor.process_ui_element_request(
+                    image_path, element, action, element
+                )
+            
             if success:
-                logger.info(f"[Chat] UI-Model success: {result}")
+                logger.info(f"[Chat] Click action success: {result}")
                 if isinstance(result, str) and os.path.exists(result):
                     # Convert to base64
                     processed_image = image_to_base64(result)
                     logger.info(f"[Chat] Processed image generated: {result}")
             else:
-                logger.error(f"[Chat] UI-Model failed: {result}")
+                logger.error(f"[Chat] Click action failed: {result}")
 
         except Exception as e:
-            logger.error(f"[Chat] UI-Model processing error: {str(e)}", exc_info=True)
+            logger.error(f"[Chat] Click processing error: {str(e)}", exc_info=True)
     elif action == "Input" and input_content:
-        # Process Input action - send text directly
-        logger.info(f"[Chat] Sending input: {input_content}")
-        image_server_client = session.image_server_client
-        script_command = f'Send "{input_content}"'
-        image_server_client.send_script_command(script_command)
-        logger.info(f"[Chat] Input sent successfully")
+        # Process Input action - click at point first, then send text
+        logger.info(f"[Chat] Sending input: {input_content} at point {point_coords}")
+        try:
+            executor = session.get_command_executor()
+            
+            if point_coords:
+                success, result = executor.execute_input_at_point(
+                    image_path, point_coords, input_content
+                )
+                if success:
+                    logger.info(f"[Chat] Input action successful: {result}")
+                else:
+                    logger.error(f"[Chat] Input action failed: {result}")
+            else:
+                # Fallback: just send text without clicking
+                image_server_client = session.image_server_client
+                script_command = f'Send "{input_content}"'
+                image_server_client.send_script_command(script_command)
+                logger.info(f"[Chat] Input sent successfully (fallback mode)")
+        except Exception as e:
+            logger.error(f"[Chat] Input processing error: {str(e)}", exc_info=True)
     elif action == "Keyboard" and key_content:
         # Process Keyboard action - send key command
         logger.info(f"[Chat] Sending keyboard key: {key_content}")

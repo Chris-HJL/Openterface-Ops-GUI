@@ -8,7 +8,7 @@ class ResponseParser:
     """Response parser class"""
 
     @staticmethod
-    def extract_action_and_element(text: str) -> Tuple[Optional[str], Optional[str], Optional[str], Optional[str]]:
+    def extract_action_and_element(text: str) -> Tuple[Optional[str], Optional[str], Optional[str], Optional[str], Optional[Tuple[int, int]]]:
         """
         Extract action and element from response
 
@@ -16,7 +16,7 @@ class ResponseParser:
             text: Response text containing <action> and <element> tags
 
         Returns:
-            Tuple (action, element, input_content, key_content), each element is None if not found
+            Tuple (action, element, input_content, key_content, point_coordinates), each element is None if not found
         """
         # Extract action
         action_pattern = r'<action>(.*?)</action>'
@@ -38,7 +38,20 @@ class ResponseParser:
         key_matches = re.findall(key_pattern, text, re.DOTALL)
         key_content = key_matches[0].strip() if key_matches else None
 
-        return (action, element, input_content, key_content)
+        # Extract point coordinates
+        point_pattern = r'<point>(.*?)</point>'
+        point_matches = re.findall(point_pattern, text, re.DOTALL)
+        point_coords = None
+        if point_matches:
+            point_str = point_matches[0].strip()
+            try:
+                coords = [int(x.strip()) for x in point_str.split(',')]
+                if len(coords) == 2:
+                    point_coords = (coords[0], coords[1])
+            except (ValueError, IndexError):
+                pass
+
+        return (action, element, input_content, key_content, point_coords)
 
     @staticmethod
     def parse_coordinates(raw_string: str) -> Tuple[int, int]:
@@ -144,6 +157,7 @@ class ResponseParser:
                 "element": str | None,
                 "text": str | None,
                 "key": str | None,
+                "point": Tuple[int, int] | None,
                 "reasoning": str | None,
                 "task_status": str | None
             }
@@ -153,6 +167,7 @@ class ResponseParser:
             - <element>Button</element> → {"element": "Button"}
             - <input>text</input> → {"text": "text"}
             - <key>Enter</key> → {"key": "Enter"}
+            - <point>x,y</point> → {"point": (x, y)}
             - <reasoning>...</reasoning> → {"reasoning": "..."}
         """
         result = {}
@@ -180,6 +195,18 @@ class ResponseParser:
         key_match = re.search(key_pattern, step_xml, re.DOTALL)
         if key_match:
             result["key"] = key_match.group(1).strip()
+
+        # 解析 point (坐标)
+        point_pattern = r'<point>(.*?)</point>'
+        point_match = re.search(point_pattern, step_xml, re.DOTALL)
+        if point_match:
+            point_str = point_match.group(1).strip()
+            try:
+                coords = [int(x.strip()) for x in point_str.split(',')]
+                if len(coords) == 2:
+                    result["point"] = (coords[0], coords[1])
+            except (ValueError, IndexError):
+                pass
 
         # 解析 reasoning
         reasoning_pattern = r'<reasoning>(.*?)</reasoning>'

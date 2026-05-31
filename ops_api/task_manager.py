@@ -465,7 +465,9 @@ class ReActTaskManager:
 
                 # Parse response
                 parser = ResponseParser()
-                action, element, input_content, key_content = parser.extract_action_and_element(response)
+                action, element, input_content, key_content, point_coords = parser.extract_action_and_element(response)
+
+                logger.info(f"[TaskManager] Parsed: action={action}, element={element}, point={point_coords}")
 
                 # Extract reasoning
                 reasoning_pattern = r'<reasoning>(.*?)</reasoning>'
@@ -589,20 +591,19 @@ class ReActTaskManager:
                     logger.info(f"[TaskManager] Executing sequence operation")
                     executor = task.session.get_command_executor()
                     parser = ResponseParser()
-                    
+
                     # Parse sequence operations from response
                     sequence_ops = parser.parse_sequence_operations(response)
-                    
+
                     if sequence_ops:
                         logger.info(f"[TaskManager] Parsed {len(sequence_ops)} steps from sequence")
-                        
-                        # Build and execute command sequence
+
+                        # Build and execute command sequence (no UI-Ins client needed)
                         success, result = executor.execute_sequence_operations(
                             sequence_ops=sequence_ops,
-                            image_path=image_path,
-                            ui_ins_client=task.session.ui_ins_client
+                            image_path=image_path
                         )
-                        
+
                         if success:
                             logger.info(f"[TaskManager] Sequence execution successful: {result}")
                             execution_success = True
@@ -615,11 +616,21 @@ class ReActTaskManager:
                         execution_error = "Failed to parse sequence operations"
                 
                 elif action in ["Click", "Double Click", "Right Click"] and element and image_path:
-                    logger.info(f"[TaskManager] Executing {action} on {element}")
+                    logger.info(f"[TaskManager] Executing {action} on {element} at point {point_coords}")
                     executor = task.session.get_command_executor()
-                    success, result = executor.process_ui_element_request(
-                        image_path, element, action, element
-                    )
+                    
+                    # Use point coordinates from LLM if available
+                    if point_coords:
+                        success, result = executor.execute_click_at_point(
+                            image_path, action, point_coords
+                        )
+                    else:
+                        # Fallback: use element description (should not happen with new model)
+                        logger.warning(f"[TaskManager] No point coordinates provided, using element description fallback")
+                        success, result = executor.process_ui_element_request(
+                            image_path, element, action, element
+                        )
+                    
                     if success:
                         logger.info(f"[TaskManager] UI action successful: {result}")
                         execution_success = True
@@ -630,12 +641,28 @@ class ReActTaskManager:
                         logger.error(f"[TaskManager] UI action failed: {result}")
                         execution_error = str(result)
                 elif action == "Input" and input_content:
-                    logger.info(f"[TaskManager] Sending input: {input_content}")
-                    script_command = f'Send "{input_content}"'
-                    image_server_client.send_script_command(script_command)
-                    logger.info(f"[TaskManager] Input sent successfully")
-                    execution_success = True
-                    execution_result = "Input sent successfully"
+                    logger.info(f"[TaskManager] Sending input: {input_content} at point {point_coords}")
+                    executor = task.session.get_command_executor()
+                    
+                    # If point coordinates are provided, click first then type
+                    if point_coords:
+                        success, result = executor.execute_input_at_point(
+                            image_path, point_coords, input_content
+                        )
+                        if success:
+                            logger.info(f"[TaskManager] Input action successful: {result}")
+                            execution_success = True
+                            execution_result = str(result)
+                        else:
+                            logger.error(f"[TaskManager] Input action failed: {result}")
+                            execution_error = str(result)
+                    else:
+                        # Fallback: just send text without clicking
+                        script_command = f'Send "{input_content}"'
+                        image_server_client.send_script_command(script_command)
+                        logger.info(f"[TaskManager] Input sent successfully (fallback mode)")
+                        execution_success = True
+                        execution_result = "Input sent successfully"
                 elif action == "Keyboard" and key_content:
                     logger.info(f"[TaskManager] Sending keyboard key: {key_content}")
                     script_command = f'Send "{{{key_content}}}"'

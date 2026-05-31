@@ -78,6 +78,144 @@ class CommandExecutor:
             return refined
         return (point_x, point_y)
 
+    def execute_click_at_point(
+        self,
+        image_path: str,
+        action: str,
+        point_coords: Tuple[int, int]
+    ) -> Tuple[bool, str]:
+        """
+        直接在指定坐标执行点击操作（使用归一化坐标 0-1000）
+
+        Args:
+            image_path: 图像文件路径
+            action: 操作类型 (Click, Double Click, Right Click)
+            point_coords: 归一化坐标 (norm_x, norm_y) 范围 0-1000
+
+        Returns:
+            Tuple (success, output image path or error message)
+        """
+        try:
+            norm_x, norm_y = point_coords
+            
+            # Convert normalized coordinates to actual pixel coordinates
+            pixel_x, pixel_y = UIInsClient.denormalize_coordinates(
+                norm_x, norm_y, image_path
+            )
+            
+            # Load resolution from image before coordinate conversion
+            self.coord_converter.load_resolution_from_image(image_path)
+            
+            # Convert pixel coordinates to HID coordinates for TCP command
+            hid_x, hid_y = self.coord_converter.pixel_to_hid(pixel_x, pixel_y)
+            
+            # Adjust HID coordinates to offset the impact of normalized coordinates
+            hid_y -= 10
+            
+            print(f"[Executor] Coordinate conversion: normalized ({norm_x}, {norm_y}) -> pixel ({pixel_x}, {pixel_y}) -> HID ({hid_x}, {hid_y})")
+            
+            # Draw rectangle on image for visualization
+            base_name = os.path.basename(image_path)
+            name, ext = os.path.splitext(base_name)
+            output_path = os.path.join(Config.OUTPUT_DIR, f"{name}_clicked{ext}")
+            
+            box_size = 50
+            left = pixel_x - box_size // 2
+            top = pixel_y - box_size // 2
+            right = pixel_x + box_size // 2
+            bottom = pixel_y + box_size // 2
+            
+            width, height = Image.open(image_path).size
+            left = max(0, left)
+            top = max(0, top)
+            right = min(width - 1, right)
+            bottom = min(height - 1, bottom)
+            
+            ImageDrawer.draw_rectangle(
+                image_path,
+                (left, top),
+                (right, bottom),
+                output_path
+            )
+            
+            # Send TCP command
+            if action == "Click":
+                script_command = f'Click {hid_x},{hid_y}'
+                self.image_server_client.send_script_command(script_command)
+            elif action == "Double Click":
+                commands = [f'Click {hid_x},{hid_y}', f'Click {hid_x},{hid_y}']
+                print(f"[Executor] Double Click: sending 2 commands with delay={Config.DOUBLE_CLICK_INTERVAL}s")
+                self.image_server_client.send_command_sequence(
+                    commands, delay=Config.DOUBLE_CLICK_INTERVAL
+                )
+            elif action == "Right Click":
+                script_command = f'Click {hid_x},{hid_y} right'
+                self.image_server_client.send_script_command(script_command)
+            else:
+                return (False, f"Unsupported action type: {action}")
+            
+            return (True, output_path)
+        
+        except Exception as e:
+            return (False, f"Error: {str(e)}")
+
+    def execute_input_at_point(
+        self,
+        image_path: str,
+        point_coords: Tuple[int, int],
+        text: str
+    ) -> Tuple[bool, str]:
+        """
+        在指定坐标点击然后输入文本
+
+        Args:
+            image_path: 图像文件路径
+            point_coords: 归一化坐标 (norm_x, norm_y) 范围 0-1000
+            text: 要输入的文本
+
+        Returns:
+            Tuple (success, message)
+        """
+        try:
+            norm_x, norm_y = point_coords
+            
+            # Convert normalized coordinates to pixel coordinates
+            pixel_x, pixel_y = UIInsClient.denormalize_coordinates(
+                norm_x, norm_y, image_path
+            )
+            
+            # Load resolution from image
+            self.coord_converter.load_resolution_from_image(image_path)
+            
+            # Convert to HID coordinates
+            hid_x, hid_y = self.coord_converter.pixel_to_hid(pixel_x, pixel_y)
+            hid_y -= 10  # Apply offset
+            
+            print(f"[Executor] Input at point: normalized ({norm_x}, {norm_y}) -> HID ({hid_x}, {hid_y})")
+            
+            # First, click to focus the input field
+            click_command = f'Click {hid_x},{hid_y}'
+            self.image_server_client.send_script_command(click_command)
+            
+            # Small delay to ensure focus
+            time.sleep(0.2)
+            
+            # Then send the text
+            # Use text splitter for long text
+            splitter = TextSplitter(max_length=25, delay_between_chunks=0.3)
+            chunks = splitter.split(text)
+            
+            for i, chunk in enumerate(chunks):
+                send_command = f'Send "{chunk}"'
+                self.image_server_client.send_script_command(send_command)
+                if i < len(chunks) - 1:
+                    time.sleep(splitter.delay_between_chunks)
+            
+            return (True, f"Input executed successfully at ({norm_x}, {norm_y})")
+        
+        except Exception as e:
+            return (False, f"Error: {str(e)}")
+
     def process_ui_element_request(
         self,
         image_path: str,
@@ -445,18 +583,10 @@ class CommandExecutor:
         Args:
             sequence_ops: 操作列表（来自 parser.parse_sequence_operations）
             image_path: 当前屏幕图像
-            ui_ins_client: UI-Ins 客户端（用于元素定位）
+            ui_ins_client: 已弃用，不再需要
 
         Returns:
             (success, message)
-
-        Example:
-            operations = [
-                {"action": "Click", "element": "Username field"},
-                {"action": "Type", "text": "admin"},
-                {"action": "Press", "key": "Tab"}
-            ]
-            success, msg = executor.execute_sequence_operations(operations, image_path, ui_ins_client)
         """
         from ops_core import ResponseParser
 
@@ -473,32 +603,23 @@ class CommandExecutor:
         for op in sequence_ops:
             action = op.get("action", "")
             element = op.get("element")
+            point = op.get("point")  # Get point coordinates from LLM
 
             if action in ["Click", "Double Click", "Right Click"]:
-                # 需要定位元素坐标
-                if element and ui_ins_client:
-                    try:
-                        # 调用 UI-Model 获取坐标
-                        ui_response = ui_ins_client.call_api(image_path, element)
-                        norm_x, norm_y = parser.parse_coordinates(ui_response)
-
-                        if norm_x != -1:
-                            # Convert normalized coordinates to pixel coordinates
-                            x, y = ui_ins_client.denormalize_coordinates(norm_x, norm_y, image_path)
-                            op_type = "click" if action == "Click" else action.lower().replace(" ", "_")
-                            operations.append({
-                                "type": op_type,
-                                "x": x,
-                                "y": y
-                            })
-                            if action == "Right Click":
-                                operations[-1]["button"] = "right"
-                            continue
-                    except Exception as e:
-                        print(f"Warning: Failed to get coordinates for '{element}': {e}")
-
-                # 无法获取坐标，跳过
-                print(f"Warning: Skipping {action} without coordinates: {element}")
+                # Use point coordinates from LLM directly
+                if point:
+                    op_type = "click" if action == "Click" else action.lower().replace(" ", "_")
+                    operations.append({
+                        "type": op_type,
+                        "norm_x": point[0],
+                        "norm_y": point[1]
+                    })
+                    if action == "Right Click":
+                        operations[-1]["button"] = "right"
+                    continue
+                
+                # Fallback: warn if no point provided
+                print(f"Warning: Skipping {action} without point coordinates: {element}")
 
             elif action == "Type":
                 text = op.get("text", "")
@@ -522,8 +643,98 @@ class CommandExecutor:
         if not operations:
             return (False, "No valid operations to execute")
 
-        # 执行操作列表
-        return self.execute_mixed_operation(image_path, operations)
+        # Execute operations with normalized coordinates
+        return self.execute_sequence_with_norm_coords(image_path, operations)
+
+    def execute_sequence_with_norm_coords(
+        self,
+        image_path: str,
+        operations: List[Dict]
+    ) -> Tuple[bool, str]:
+        """
+        执行带有归一化坐标的操作序列
+
+        Args:
+            image_path: 屏幕图像路径
+            operations: 操作列表，包含归一化坐标
+
+        Returns:
+            (success, message)
+        """
+        try:
+            # Load resolution from image
+            self.coord_converter.load_resolution_from_image(image_path)
+            
+            results = []
+            
+            for op in operations:
+                op_type = op.get("type", "").lower()
+                
+                if op_type == "click":
+                    # Convert normalized coordinates to HID
+                    norm_x = op.get("norm_x", 0)
+                    norm_y = op.get("norm_y", 0)
+                    button = op.get("button", "left")
+                    
+                    # Normalize to pixel
+                    pixel_x, pixel_y = UIInsClient.denormalize_coordinates(norm_x, norm_y, image_path)
+                    
+                    # Pixel to HID
+                    hid_x, hid_y = self.coord_converter.pixel_to_hid(pixel_x, pixel_y)
+                    hid_y -= 10  # Apply offset
+                    
+                    if button == "left":
+                        cmd = f'Click {hid_x},{hid_y}'
+                    else:
+                        cmd = f'Click {hid_x},{hid_y} {button}'
+                    
+                    self.image_server_client.send_script_command(cmd)
+                    results.append(cmd)
+                    
+                elif op_type == "double_click":
+                    norm_x = op.get("norm_x", 0)
+                    norm_y = op.get("norm_y", 0)
+                    
+                    pixel_x, pixel_y = UIInsClient.denormalize_coordinates(norm_x, norm_y, image_path)
+                    hid_x, hid_y = self.coord_converter.pixel_to_hid(pixel_x, pixel_y)
+                    hid_y -= 10
+                    
+                    commands = [f'Click {hid_x},{hid_y}', f'Click {hid_x},{hid_y}']
+                    self.image_server_client.send_command_sequence(
+                        commands, delay=Config.DOUBLE_CLICK_INTERVAL
+                    )
+                    results.extend(commands)
+                    
+                elif op_type == "type":
+                    text = op.get("text", "")
+                    splitter = TextSplitter(max_length=25, delay_between_chunks=0.3)
+                    chunks = splitter.split(text)
+                    
+                    for i, chunk in enumerate(chunks):
+                        cmd = f'Send "{chunk}"'
+                        self.image_server_client.send_script_command(cmd)
+                        results.append(cmd)
+                        if i < len(chunks) - 1:
+                            time.sleep(splitter.delay_between_chunks)
+                    
+                elif op_type == "key":
+                    key = op.get("key", "")
+                    key_code = get_tcp_key_code(key)
+                    cmd = f'Send "{key_code}"'
+                    self.image_server_client.send_script_command(cmd)
+                    results.append(cmd)
+                    
+                elif op_type == "wait":
+                    duration = op.get("duration", 0.5)
+                    time.sleep(duration)
+                
+                # Delay between operations
+                time.sleep(0.3)
+            
+            return (True, f"Successfully executed {len(results)} operations")
+        
+        except Exception as e:
+            return (False, f"Error executing sequence: {str(e)}")
 
     def execute_search_flow(
         self,
