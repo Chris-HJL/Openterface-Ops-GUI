@@ -70,11 +70,11 @@ For example: <scene>bios</scene> or <scene>os_installation</scene>"""
                 "max_tokens": 2000,
                 "model": self.model,
                 # "chat_template_kwargs": {"enable_thinking": True}
-                "temperature": 0.7,
-                "top_p": 0.8,
-                "presence_penalty": 1.5,
-                "top_k": 20,
-                "chat_template_kwargs": {"enable_thinking": False},
+                # "temperature": 0.7,
+                # "top_p": 0.8,
+                # "presence_penalty": 1.5,
+                # "top_k": 20,
+                # "chat_template_kwargs": {"enable_thinking": False},
             }
 
             response = requests.post(

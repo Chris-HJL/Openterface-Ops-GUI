@@ -103,10 +103,6 @@ class SessionManager:
                 session.api_url = request.api_url
             if request.model:
                 session.model = request.model
-            if request.ui_model_api_url:
-                session.ui_model_api_url = request.ui_model_api_url
-            if request.ui_model:
-                session.ui_model = request.ui_model
 
             self.sessions[session_id] = session
 
@@ -274,7 +270,7 @@ async def chat(request: ChatRequest):
         updated_history.append({"role": "assistant", "content": response})
         session.conversation_history = updated_history
 
-    # Check UI-Model request
+    # Check for UI action in response
     processed_image = None
     parser = ResponseParser()
     action, element, input_content, key_content, point_coords = parser.extract_action_and_element(response)
@@ -286,19 +282,18 @@ async def chat(request: ChatRequest):
         logger.info(f"[Chat] Processing click request: {action} on {element} at point {point_coords}")
         try:
             executor = session.get_command_executor()
-            
-            # Use point coordinates from LLM if available
+
+            # Use point coordinates from LLM
             if point_coords:
                 success, result = executor.execute_click_at_point(
                     image_path, action, point_coords
                 )
             else:
-                # Fallback: use element description (should not happen with new model)
-                logger.warning(f"[Chat] No point coordinates provided, using element description fallback")
-                success, result = executor.process_ui_element_request(
-                    image_path, element, action, element
-                )
-            
+                # Should not happen with new model
+                logger.error(f"[Chat] No point coordinates provided for click action")
+                success = False
+                result = "No point coordinates provided"
+
             if success:
                 logger.info(f"[Chat] Click action success: {result}")
                 if isinstance(result, str) and os.path.exists(result):
@@ -658,11 +653,9 @@ async def get_status(session_id: str):
     # Check API connection
     tester = APIConnectionTester()
     api_status = "Available" if tester.test_connection(session.api_url) else "Unavailable"
-    ui_model_status = "Available" if tester.test_connection(session.ui_model_api_url) else "Unavailable"
 
     return StatusResponse(
         api_status=api_status,
-        ui_model_status=ui_model_status,
         success=True
     )
 
@@ -924,8 +917,8 @@ async def react(request: ReactRequest):
 
             # Parse response
             parser = ResponseParser()
-            action, element, input_content, key_content = parser.extract_action_and_element(response)
-            logger.info(f"[ReAct] Parsed action: {action}, element: {element}, input: {input_content}, key: {key_content}")
+            action, element, input_content, key_content, point_coords = parser.extract_action_and_element(response)
+            logger.info(f"[ReAct] Parsed action: {action}, element: {element}, input: {input_content}, key: {key_content}, point: {point_coords}")
 
             # Extract reasoning
             reasoning_pattern = r'<reasoning>(.*?)</reasoning>'
@@ -987,11 +980,18 @@ async def react(request: ReactRequest):
             execution_error = None
 
             if action in ["Click", "Double Click", "Right Click"] and element and image_path:
-                logger.info(f"[ReAct] Executing {action} on {element}")
+                logger.info(f"[ReAct] Executing {action} on {element} at point {point_coords}")
                 executor = session.get_command_executor()
-                success, result = executor.process_ui_element_request(
-                    image_path, element, action, element
-                )
+
+                if point_coords:
+                    success, result = executor.execute_click_at_point(
+                        image_path, action, point_coords
+                    )
+                else:
+                    logger.error(f"[ReAct] No point coordinates provided for click action")
+                    success = False
+                    result = "No point coordinates provided"
+
                 if success:
                     logger.info(f"[ReAct] UI action successful: {result}")
                     execution_success = True

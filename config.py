@@ -11,8 +11,6 @@ class Config:
     # API 配置
     DEFAULT_API_URL: str = "http://localhost:11434/v1/chat/completions"
     DEFAULT_MODEL: str = "qwen3-vl:8b-thinking-q4_K_M"
-    DEFAULT_UI_MODEL_API_URL: str = "http://localhost:2345/v1/chat/completions"
-    DEFAULT_UI_MODEL: str = "fara-7b"
 
     # RAG 配置
     RAG_API_BASE: str = "http://localhost:11434/v1"
@@ -94,11 +92,6 @@ class Config:
     def get_api_key(cls) -> str:
         """Get API key"""
         return cls.get_env("LLM_API_KEY", "EMPTY")
-
-    @classmethod
-    def get_ui_api_key(cls) -> str:
-        """Get UI-Model API key"""
-        return cls.get_env("UI_API_KEY", "EMPTY")
 
     @classmethod
     def reload_from_env(cls):

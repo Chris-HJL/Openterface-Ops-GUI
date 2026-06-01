@@ -9,8 +9,6 @@ class CreateSessionRequest(BaseModel):
     language: Optional[str] = "en"
     api_url: Optional[str] = None
     model: Optional[str] = None
-    ui_model_api_url: Optional[str] = None
-    ui_model: Optional[str] = None
 
 class ChatRequest(BaseModel):
     session_id: str
@@ -120,7 +118,6 @@ class IndexResponse(BaseModel):
 
 class StatusResponse(BaseModel):
     api_status: str
-    ui_model_status: str
     success: bool
 
 class LangResponse(BaseModel):

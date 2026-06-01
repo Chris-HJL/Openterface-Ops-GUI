@@ -6,7 +6,7 @@ from .image import ImageEncoder, ImageDrawer
 from .rag import IndexBuilder, IndexLoader, DocumentRetriever, MHTMLReader
 from .api import APIConnectionTester, LLMAPIClient
 from .image_server import ImageServerClient
-from .ui_operations import ResponseParser, UIInsClient, CommandExecutor
+from .ui_operations import ResponseParser, CommandExecutor
 from .prompts import PromptRegistry, SceneType, PromptLoader, SceneDetector
 
 __all__ = [
@@ -21,7 +21,6 @@ __all__ = [
     'LLMAPIClient',
     'ImageServerClient',
     'ResponseParser',
-    'UIInsClient',
     'CommandExecutor',
     'PromptRegistry',
     'SceneType',

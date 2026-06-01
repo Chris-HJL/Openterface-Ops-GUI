@@ -7,7 +7,6 @@ import os
 import time
 from config import Config
 from .parser import ResponseParser
-from .ui_ins_client import UIInsClient
 from .checkbox_detector import CheckboxDetector
 from ..image.drawer import ImageDrawer
 from ..image_server.client import ImageServerClient
@@ -18,16 +17,8 @@ from ..utils.text_splitter import TextSplitter
 class CommandExecutor:
     """Command executor class"""
 
-    def __init__(self, ui_ins_api_url: str = None, ui_ins_model: str = None, ui_ins_api_key: str = None):
-        """
-        Initialize command executor
-
-        Args:
-            ui_ins_api_url: UI-Ins API URL
-            ui_ins_model: UI-Ins model name
-            ui_ins_api_key: UI-Ins API key
-        """
-        self.ui_ins_client = UIInsClient(ui_ins_api_url, ui_ins_model, ui_ins_api_key)
+    def __init__(self):
+        """Initialize command executor"""
         self.image_server_client = ImageServerClient()
         self.parser = ResponseParser()
         self.checkbox_detector = CheckboxDetector()
@@ -99,7 +90,7 @@ class CommandExecutor:
             norm_x, norm_y = point_coords
             
             # Convert normalized coordinates to actual pixel coordinates
-            pixel_x, pixel_y = UIInsClient.denormalize_coordinates(
+            pixel_x, pixel_y = self.coord_converter.denormalize_coordinates(
                 norm_x, norm_y, image_path
             )
             
@@ -180,7 +171,7 @@ class CommandExecutor:
             norm_x, norm_y = point_coords
             
             # Convert normalized coordinates to pixel coordinates
-            pixel_x, pixel_y = UIInsClient.denormalize_coordinates(
+            pixel_x, pixel_y = self.coord_converter.denormalize_coordinates(
                 norm_x, norm_y, image_path
             )
             
@@ -213,125 +204,6 @@ class CommandExecutor:
             
             return (True, f"Input executed successfully at ({norm_x}, {norm_y})")
         
-        except Exception as e:
-            return (False, f"Error: {str(e)}")
-
-    def process_ui_element_request(
-        self,
-        image_path: str,
-        instruction: str,
-        action: str,
-        element: str = None,
-        input_content: str = None,
-        key_content: str = None
-    ) -> Tuple[bool, str]:
-        """
-        Process UI element request
-
-        Args:
-            image_path: Image file path
-            instruction: Instruction text
-            action: Action type
-            element: Element name
-            input_content: Input content
-            key_content: Key content
-
-        Returns:
-            Tuple (success, output image path or error message)
-        """
-        try:
-            if action in ["Click", "Double Click", "Right Click"] and element:
-                ui_model_response = self.ui_ins_client.call_api(image_path, element)
-                print(f"UI-Model Response: {ui_model_response}")
-
-                # Parse normalized coordinates from UI-Model (0-1000 grid)
-                norm_x, norm_y = self.parser.parse_coordinates(ui_model_response)
-
-                if norm_x != -1:
-                    # Convert normalized coordinates to actual pixel coordinates
-                    pixel_x, pixel_y = self.ui_ins_client.denormalize_coordinates(
-                        norm_x, norm_y, image_path
-                    )
-                    # ✨ Load resolution from image before coordinate conversion
-                    self.coord_converter.load_resolution_from_image(image_path)
-
-                    # Refine checkbox coordinates if needed (still in pixel coordinates)
-                    # if self._is_checkbox_element(element):
-                    #     pixel_x, pixel_y = self._refine_checkbox_coordinates(
-                    #         image_path, pixel_x, pixel_y
-                    #     )
-
-                    # Convert pixel coordinates to HID coordinates for TCP command
-                    hid_x, hid_y = self.coord_converter.pixel_to_hid(pixel_x, pixel_y)
-
-                    # Adjust HID coordinates to offset the impact of normalized coordinates
-                    hid_y -= 10
-
-                    print(f"[Executor] Coordinate conversion: pixel ({pixel_x}, {pixel_y}) -> HID ({hid_x}, {hid_y})")
-
-                    base_name = os.path.basename(image_path)
-                    name, ext = os.path.splitext(base_name)
-                    output_path = os.path.join(Config.OUTPUT_DIR, f"{name}_ui_model{ext}")
-
-                    # Drawing on image uses pixel coordinates
-                    box_size = 50
-                    left = pixel_x - box_size // 2
-                    top = pixel_y - box_size // 2
-                    right = pixel_x + box_size // 2
-                    bottom = pixel_y + box_size // 2
-
-                    width, height = Image.open(image_path).size
-                    left = max(0, left)
-                    top = max(0, top)
-                    right = min(width - 1, right)
-                    bottom = min(height - 1, bottom)
-
-                    ImageDrawer.draw_rectangle(
-                        image_path,
-                        (left, top),
-                        (right, bottom),
-                        output_path
-                    )
-
-                    # TCP command uses HID coordinates
-                    # Click is an independent command, not embedded in Send
-                    if action == "Click":
-                        script_command = f'Click {hid_x},{hid_y}'
-                    elif action == "Double Click":
-                        script_command = f'Click {hid_x},{hid_y}\nClick {hid_x},{hid_y}'
-                    elif action == "Right Click":
-                        script_command = f'Click {hid_x},{hid_y} right'
-                    else:
-                        script_command = None
-
-                    if script_command:
-                        if action == "Double Click":
-                            commands = script_command.split('\n')
-                            print(f"[Executor] Double Click: sending {len(commands)} commands with delay={Config.DOUBLE_CLICK_INTERVAL}s")
-                            print(f"[Executor] Commands: {commands}")
-                            self.image_server_client.send_command_sequence(
-                                commands, delay=Config.DOUBLE_CLICK_INTERVAL
-                            )
-                        else:
-                            # For single click or right-click, send directly
-                            self.image_server_client.send_script_command(script_command)
-
-                    return (True, output_path)
-
-            elif action == "Input" and input_content:
-                # Process Input action - send text directly
-                script_command = f'Send "{input_content}"'
-                self.image_server_client.send_script_command(script_command)
-                return (True, "Input executed successfully")
-
-            elif action == "Keyboard" and key_content:
-                # Process Keyboard action - send key command
-                script_command = f'Send "{{{key_content}}}"'
-                self.image_server_client.send_script_command(script_command)
-                return (True, "Keyboard executed successfully")
-
-            return (False, "Invalid action or missing parameters")
-
         except Exception as e:
             return (False, f"Error: {str(e)}")
 
@@ -574,8 +446,7 @@ class CommandExecutor:
     def execute_sequence_operations(
         self,
         sequence_ops: List[Dict],
-        image_path: str,
-        ui_ins_client=None
+        image_path: str
     ) -> Tuple[bool, str]:
         """
         执行序列操作（从 parser 解析的操作列表）
@@ -583,7 +454,6 @@ class CommandExecutor:
         Args:
             sequence_ops: 操作列表（来自 parser.parse_sequence_operations）
             image_path: 当前屏幕图像
-            ui_ins_client: 已弃用，不再需要
 
         Returns:
             (success, message)
@@ -677,7 +547,7 @@ class CommandExecutor:
                     button = op.get("button", "left")
                     
                     # Normalize to pixel
-                    pixel_x, pixel_y = UIInsClient.denormalize_coordinates(norm_x, norm_y, image_path)
+                    pixel_x, pixel_y = self.coord_converter.denormalize_coordinates(norm_x, norm_y, image_path)
                     
                     # Pixel to HID
                     hid_x, hid_y = self.coord_converter.pixel_to_hid(pixel_x, pixel_y)
@@ -695,7 +565,7 @@ class CommandExecutor:
                     norm_x = op.get("norm_x", 0)
                     norm_y = op.get("norm_y", 0)
                     
-                    pixel_x, pixel_y = UIInsClient.denormalize_coordinates(norm_x, norm_y, image_path)
+                    pixel_x, pixel_y = self.coord_converter.denormalize_coordinates(norm_x, norm_y, image_path)
                     hid_x, hid_y = self.coord_converter.pixel_to_hid(pixel_x, pixel_y)
                     hid_y -= 10
                     

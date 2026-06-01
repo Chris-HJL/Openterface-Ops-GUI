@@ -475,14 +475,6 @@
                     <input type="text" id="model" placeholder="Enter LLM Model Name" value="qwen3.6-27b">
                 </div>
                 <div class="config-item">
-                    <label for="ui-model-api-url">UI-Model API URL:</label>
-                    <input type="text" id="ui-model-api-url" placeholder="Enter UI-Model API URL" value="http://localhost:8000/v1/chat/completions">
-                </div>
-                <div class="config-item">
-                    <label for="ui-model">UI-Model:</label>
-                    <input type="text" id="ui-model" placeholder="Enter UI-Model Name" value="qwen3.6-27b">
-                </div>
-                <div class="config-item">
                     <label for="react-max-iterations">Agent Max Iterations:</label>
                     <input type="number" id="react-max-iterations" placeholder="Enter max iterations" value="20" min="1">
                 </div>
@@ -502,17 +494,14 @@
                 <h4>API Key Configuration</h4>
                 <p>Please set the following environment variables before running the application:</p>
                 <ul style="list-style-type: disc; margin-left: 20px;">
-                    <li><strong>LLM_API_KEY</strong>: API key for the main language model (default: "EMPTY")</li>
-                    <li><strong>UI_API_KEY</strong>: API key for the UI-Model (default: "EMPTY")</li>
+                    <li><strong>LLM_API_KEY</strong>: API key for the language model (default: "EMPTY")</li>
                 </ul>
                 <p>Example for Windows:</p>
                 <pre style="background-color: #e0e0e0; padding: 10px; border-radius: 4px; overflow-x: auto;">
-set LLM_API_KEY=your_llm_api_key
-set UI_API_KEY=your_ui_api_key</pre>
+set LLM_API_KEY=your_llm_api_key</pre>
                 <p>Example for Linux/Mac:</p>
                 <pre style="background-color: #e0e0e0; padding: 10px; border-radius: 4px; overflow-x: auto;">
-export LLM_API_KEY=your_llm_api_key
-export UI_API_KEY=your_ui_api_key</pre>
+export LLM_API_KEY=your_llm_api_key</pre>
             </div>
             <div class="config-actions">
                 <button id="init-btn">Initialize Session</button>
@@ -615,9 +604,7 @@ export UI_API_KEY=your_ui_api_key</pre>
                 // Get configuration from input fields
                 const apiUrl = document.getElementById('api-url').value;
                 const model = document.getElementById('model').value;
-                const uiModelApiUrl = document.getElementById('ui-model-api-url').value;
-                const uiModel = document.getElementById('ui-model').value;
-                
+
                 // Create session with configuration
                 const sessionResponse = await fetch(`${API_BASE_URL}/create-session`, {
                     method: 'POST',
@@ -627,9 +614,7 @@ export UI_API_KEY=your_ui_api_key</pre>
                     body: JSON.stringify({
                         language: 'en',
                         api_url: apiUrl,
-                        model: model,
-                        ui_model_api_url: uiModelApiUrl,
-                        ui_model: uiModel
+                        model: model
                     })
                 });
                 
@@ -781,14 +766,13 @@ export UI_API_KEY=your_ui_api_key</pre>
             if (query.toLowerCase() === '/info') {
                 addMessage(query, 'user');
                 queryInput.value = '';
-                
+
                 try {
                     const response = await fetch(`${API_BASE_URL}/status/${sessionId}`);
                     const data = await response.json();
                     if (data.success) {
                         const infoMessage = `API Status Information:<br>
-Main API Status: ${data.api_status}<br>
-UI-Model API Status: ${data.ui_model_status}`;
+Main API Status: ${data.api_status}`;
                         addMessage(infoMessage, 'assistant');
                     } else {
                         throw new Error('Failed to get API status');

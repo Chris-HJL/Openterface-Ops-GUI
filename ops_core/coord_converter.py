@@ -3,7 +3,7 @@ Coordinate conversion module
 Provides bidirectional conversion between pixel coordinates and HID normalized coordinates
 
 This module solves the coordinate system mismatch issue:
-- UI-Model returns pixel coordinates (based on screen resolution)
+- LLM returns normalized coordinates (0-1000 grid)
 - Openterface KVM expects HID coordinates (0-4096 normalized range)
 """
 from typing import Tuple, Optional
@@ -183,6 +183,27 @@ class CoordinateConverter:
         pixel_x = max(0, min(width - 1, pixel_x))
         pixel_y = max(0, min(height - 1, pixel_y))
 
+        return (pixel_x, pixel_y)
+
+    @staticmethod
+    def denormalize_coordinates(
+        norm_x: int, norm_y: int, image_path: str
+    ) -> Tuple[int, int]:
+        """
+        Convert normalized coordinates (0-1000) to actual pixel coordinates
+
+        Args:
+            norm_x: Normalized x coordinate (0-1000)
+            norm_y: Normalized y coordinate (0-1000)
+            image_path: Path to the original image
+
+        Returns:
+            Tuple (pixel_x, pixel_y) in actual image coordinates
+        """
+        img = Image.open(image_path)
+        width, height = img.size
+        pixel_x = int(norm_x * width / 1000)
+        pixel_y = int(norm_y * height / 1000)
         return (pixel_x, pixel_y)
 
 
