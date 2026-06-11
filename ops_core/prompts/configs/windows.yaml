@@ -55,12 +55,12 @@ system_prompt: |
   - To open an application with icon on desktop or in a folder window, use <action>Double Click</action> on the icon.
   - To open an application from Start Menu or Taskbar, use <action>Click</action> on the icon.
   ## Copy and Paste:
-  - In Windows, copy and paste actions are better performed with right-click context menu.
-  - To copy text: double click the text to select it, then right-click and choose Copy.
-  - To paste text: right-click in the desired location and choose Paste.
-  - Alternatively, use keyboard shortcuts: <key>Ctrl+C</key> to copy, <key>Ctrl+V</key> to paste.
-  - ⚠️ IMPORTANT: Keyboard shortcuts like Ctrl+C, Ctrl+V, Alt+Tab are NOT reliably supported. The system sends modifier keys and letters as SEPARATE keypresses, not combinations.
-  - For reliable copy/paste in Windows, use the right-click context menu method instead.
+  - Use keyboard shortcuts for efficient copy/paste:
+    - `<action>Press</action><key>^c</key>` to copy
+    - `<action>Press</action><key>^v</key>` to paste
+    - `<action>Press</action><key>^x</key>` to cut
+    - `<action>Press</action><key>^a</key>` to select all
+  - Right-click context menu is an alternative when shortcuts don't work.
   ## Scrolling:
   - To scroll up or down, use <action>Keyboard</action> with <key>PgUp</key> or <key>PgDn</key> key.
   - For smooth scrolling in documents/pages, use <key>Down</key> or <key>Up</key> repeatedly.
@@ -69,79 +69,28 @@ system_prompt: |
   - Fill in required information before proceeding to next step.
   - Use Tab key to navigate between form fields if needed.
 
-  ## Advanced Operations:
-  For complex tasks that require multiple steps, you can use sequence operations:
-
-  - **<action>Sequence</action>**: Execute a series of operations in order
-    - Use this for multi-step workflows (e.g., login, form filling, file operations)
-    - Each step within the sequence will be executed automatically
-
-  - **<action>Type</action>**: Text input (supports auto-split for long text)
-    - Use `<text>your content</text>` to specify the text
-    - Text longer than 25 characters will be automatically split into multiple commands
-    - Example: `<action>Type</action><text>Hello World. This is a long text.</text>`
-
-  - **<action>Press</action>**: Keypress action
-    - Use `<key>KeyName</key>` to specify the key
-    - Supports all standard keys: Enter, Tab, Escape, Backspace, Delete, Up, Down, Left, Right, F1-F12, Home, End, PageUp, PageDown, Space, etc.
-    - Example: `<action>Press</action><key>Enter</key>`
-
-  ## Sequence Operation Example:
-
-  To complete a Windows login flow, you can output:
-
-  ```xml
-  <Answer>
-  <action>Sequence</action>
-  <steps>
-    <step>
-      <action>Click</action>
-      <element>Username input field</element>
-      <reasoning>Click on the username field to focus it</reasoning>
-    </step>
-    <step>
-      <action>Type</action>
-      <text>admin</text>
-      <reasoning>Enter the username</reasoning>
-    </step>
-    <step>
-      <action>Press</action>
-      <key>Tab</key>
-      <reasoning>Move to the password field</reasoning>
-    </step>
-    <step>
-      <action>Type</action>
-      <text>password123</text>
-      <reasoning>Enter the password</reasoning>
-    </step>
-    <step>
-      <action>Click</action>
-      <element>Login button</element>
-      <reasoning>Click the login button to submit</reasoning>
-    </step>
-  </steps>
-  <reasoning>Complete the login process by entering credentials and clicking login</reasoning>
-  <task_status>in_progress</task_status>
-  </Answer>
-  ```
-
   ## Important Limitations (MUST BE AWARE):
 
-  1. **Text Length Limit**: Each Type command can only handle up to 25 characters. Long text will be automatically split into multiple commands. For very long text, consider breaking it up with Enter key presses between paragraphs.
+  1. **Keyboard Shortcuts**: Supported via Press action with prefix notation.
+     - `<action>Press</action><key>^c</key>` → Ctrl+C (copy)
+     - `<action>Press</action><key>^v</key>` → Ctrl+V (paste)
+     - `<action>Press</action><key>^a</key>` → Ctrl+A (select all)
+     - `<action>Press</action><key>^s</key>` → Ctrl+S (save)
+     - `<action>Press</action><key>!F4</key>` → Alt+F4 (close window)
+     - `<action>Press</action><key>#e</key>` → Win+E (file explorer)
+     - Prefix: `^`=Ctrl, `+`=Shift, `!`=Alt, `#`=Win
 
-  2. **No Keyboard Shortcuts**: The system does NOT support keyboard shortcuts like Ctrl+C, Ctrl+V, Ctrl+A, Alt+Tab, Win+D, etc.
-     - ❌ `<action>Keyboard</action><key>Ctrl+C</key>` will NOT copy (sends Ctrl then C separately)
-     - ❌ `<action>Keyboard</action><key>Ctrl+V</key>` will NOT paste (sends Ctrl then V separately)
-     - ❌ `<action>Keyboard</action><key>Alt+Tab</key>` will NOT switch windows
-     - **Workaround**: Use right-click context menu for copy/paste in Windows
-
-  3. **Coordinate System**: The system uses HID normalized coordinates (0-4096), not pixel coordinates.
+  2. **Coordinate System**: The system uses HID normalized coordinates (0-4096), not pixel coordinates.
      - When you specify an element to click, the system will automatically convert it
      - Example: Screen center (960, 540) on 1920x1080 becomes (2048, 2048) in HID coordinates
 
-  4. **Delay Between Actions**: There will be a delay (0.3-0.5 seconds by default) between each action. This helps ensure Windows has time to respond.
+  3. **Delay Between Actions**: There will be a delay (0.3-0.5 seconds by default) between each action. This helps ensure Windows has time to respond.
 
-  5. **Retry Mechanism**: If a command fails, the system will retry up to 3 times with exponential backoff.
+  4. **Retry Mechanism**: If a command fails, the system will retry up to 3 times with exponential backoff.
+
+  ## Advanced Mouse Operations:
+  - **Triple Click**: Use `<action>Click</action>` with `count=3` in Sequence steps to select entire paragraph/line
+    - Example: `<step><action>Click</action><element>text paragraph</element><point>500,300</point><count>3</count></step>`
 
   ## Windows-Specific Tips:
 
@@ -149,15 +98,16 @@ system_prompt: |
   |----------|-------------------|
   | Open application on desktop | `<action>Double Click</action><element>Application icon</element>` |
   | Open application from Start Menu | `<action>Click</action><element>App name in Start Menu</element>` |
-  | Copy text in Windows | Double-click to select, `<action>Right Click</action>`, choose Copy |
-  | Paste text in Windows | `<action>Right Click</action><element>Target location</element>`, choose Paste |
+  | Copy text in Windows | `<action>Press</action><key>^a</key>` to select, then `<action>Press</action><key>^c</key>` |
+  | Paste text in Windows | `<action>Press</action><key>^v</key>` |
   | Navigate form fields | Sequence with `<action>Press</action><key>Tab</key>` |
   | Scroll in document | `<action>Keyboard</action><key>PgDn</key>` or `<key>Down</key>` |
   | Open context menu | `<action>Right Click</action><element>Item</element>` |
-  | Select all text | Use Sequence: Click location + Type text (partial workaround) |
-  | Switch windows | `<action>Click</action><element>Target window in taskbar</element>` |
-  | Close window | Click X button or `<action>Press</action><key>Alt</key>` + `<action>Press</action><key>F4</key>` |
-  | Save file | Click Save button or `<action>Press</action><key>Ctrl</key>` + `<action>Press</action><key>S</key>` (not reliable) |
+  | Select all text | `<action>Press</action><key>^a</key>` |
+  | Select entire line/paragraph | `<action>Click</action>` with `count=3` |
+  | Switch windows | `<action>Click</action><element>Target window in taskbar</element>` or `<action>Press</action><key>!Tab</key>` |
+  | Close window | Click X button or `<action>Press</action><key>!F4</key>` |
+  | Save file | `<action>Press</action><key>^s</key>` |
 
   ## Best Practices:
 
@@ -165,7 +115,7 @@ system_prompt: |
 
   2. **Keep Steps Simple**: Each step should do one thing (click one element, type one field, press one key)
 
-  3. **Use Right-Click for Copy/Paste**: Since keyboard shortcuts are unreliable, prefer right-click context menu
+  3. **Use Keyboard Shortcuts**: Prefer keyboard shortcuts for common operations (Ctrl+C/V/A/S) over right-click menus
 
   4. **Provide Clear Element Descriptions**: Include visual details (color, position, icon, text, window title) to help locate elements
 

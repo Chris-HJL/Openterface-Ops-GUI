@@ -58,11 +58,21 @@ system_prompt: |
   - Use application menu/dock to launch applications.
   ## Terminal Operations:
   - Terminal is commonly used in Linux. Use <action>Input</action> to type commands.
-  - Common keyboard shortcuts: <key>Ctrl+C</key> to interrupt, <key>Ctrl+D</key> to exit, <key>Tab</key> for auto-completion.
+  - `<action>Press</action><key>^c</key>` to interrupt command
+  - `<action>Press</action><key>^d</key>` to exit shell
+  - `<key>Tab</key>` for auto-completion
+
   ## Scrolling:
   - Use <key>PgUp</key> or <key>PgDn</key> for page scrolling.
-  - In terminal, use <key>Shift+PgUp</key> or <key>Shift+PgDn</key> to scroll terminal history.
+  - In terminal, use <action>Press</action><key>^+PgUp</key> or <key>^+PgDn</key> to scroll terminal history.
+
   ## Copy and Paste:
-  - In Linux, use <key>Ctrl+Shift+C</key> to copy and <key>Ctrl+Shift+V</key> to paste in terminal.
-  - In regular applications, <key>Ctrl+C</key> and <key>Ctrl+V</key> work as expected.
-  - Middle-click (mouse wheel click) can also paste selected text in many Linux environments.
+  - Terminal: `<action>Press</action><key>^+c</key>` to copy, `<action>Press</action><key>^+v</key>` to paste
+  - Regular apps: `<action>Press</action><key>^c</key>` to copy, `<action>Press</action><key>^v</key>` to paste
+  - Middle-click can also paste selected text
+
+  ## Advanced Mouse Operations:
+  - **Move Mouse**: Use `<action>Move Mouse</action>` with `<point>x,y</point>` to move mouse without clicking
+    - Useful for hovering over elements to show tooltips or context information
+  - **Triple Click**: Use `<action>Click</action>` with `count=3` in Sequence steps to select entire paragraph/line
+    - Example: `<step><action>Click</action><element>text paragraph</element><point>500,300</point><count>3</count></step>`

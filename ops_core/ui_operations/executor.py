@@ -11,7 +11,7 @@ from .checkbox_detector import CheckboxDetector
 from ..image.drawer import ImageDrawer
 from ..image_server.client import ImageServerClient
 from ..coord_converter import CoordinateConverter
-from ..utils.key_map import get_tcp_key_code
+from ..utils.key_map import get_tcp_key_code, is_combo_key
 from ..utils.text_splitter import TextSplitter
 
 class CommandExecutor:
@@ -99,10 +99,9 @@ class CommandExecutor:
             
             # Convert pixel coordinates to HID coordinates for TCP command
             hid_x, hid_y = self.coord_converter.pixel_to_hid(pixel_x, pixel_y)
-            
-            # Adjust HID coordinates to offset the impact of normalized coordinates
-            hid_y -= 10
-            
+
+            # Y offset is now applied inside coord_converter.pixel_to_hid()
+
             print(f"[Executor] Coordinate conversion: normalized ({norm_x}, {norm_y}) -> pixel ({pixel_x}, {pixel_y}) -> HID ({hid_x}, {hid_y})")
             
             # Draw rectangle on image for visualization
@@ -178,10 +177,9 @@ class CommandExecutor:
             # Load resolution from image
             self.coord_converter.load_resolution_from_image(image_path)
             
-            # Convert to HID coordinates
+            # Convert to HID coordinates (Y offset applied inside pixel_to_hid)
             hid_x, hid_y = self.coord_converter.pixel_to_hid(pixel_x, pixel_y)
-            hid_y -= 10  # Apply offset
-            
+
             print(f"[Executor] Input at point: normalized ({norm_x}, {norm_y}) -> HID ({hid_x}, {hid_y})")
             
             # First, click to focus the input field
@@ -384,6 +382,29 @@ class CommandExecutor:
                 duration = op.get("duration", 0.5)
                 builder.wait(duration)
 
+            elif op_type == "move_mouse":
+                x = op.get("x", 0)
+                y = op.get("y", 0)
+                delay = op.get("delay", Config.MOUSE_MOVE_DELAY)
+                builder.move_mouse(x, y, delay)
+
+            elif op_type == "triple_click":
+                x = op.get("x", 0)
+                y = op.get("y", 0)
+                delay = op.get("delay", 0.3)
+                builder.triple_click(x, y, delay)
+
+            elif op_type == "lock_state":
+                lock_type = op.get("lock_type", "CapsLock")
+                state = op.get("state", "On")
+                delay = op.get("delay", 0.3)
+                builder.set_lock_state(lock_type, state, delay)
+
+            elif op_type == "screenshot":
+                path = op.get("path", "/tmp/screenshot.png")
+                delay = op.get("delay", 0.5)
+                builder.full_screen_capture(path, delay)
+
             else:
                 print(f"Warning: Unknown operation type '{op_type}', skipping")
 
@@ -549,10 +570,9 @@ class CommandExecutor:
                     # Normalize to pixel
                     pixel_x, pixel_y = self.coord_converter.denormalize_coordinates(norm_x, norm_y, image_path)
                     
-                    # Pixel to HID
+                    # Pixel to HID (Y offset applied inside pixel_to_hid)
                     hid_x, hid_y = self.coord_converter.pixel_to_hid(pixel_x, pixel_y)
-                    hid_y -= 10  # Apply offset
-                    
+
                     if button == "left":
                         cmd = f'Click {hid_x},{hid_y}'
                     else:
@@ -567,8 +587,7 @@ class CommandExecutor:
                     
                     pixel_x, pixel_y = self.coord_converter.denormalize_coordinates(norm_x, norm_y, image_path)
                     hid_x, hid_y = self.coord_converter.pixel_to_hid(pixel_x, pixel_y)
-                    hid_y -= 10
-                    
+
                     commands = [f'Click {hid_x},{hid_y}', f'Click {hid_x},{hid_y}']
                     self.image_server_client.send_command_sequence(
                         commands, delay=Config.DOUBLE_CLICK_INTERVAL
@@ -590,13 +609,50 @@ class CommandExecutor:
                 elif op_type == "key":
                     key = op.get("key", "")
                     key_code = get_tcp_key_code(key)
-                    cmd = f'Send "{key_code}"'
+                    # Combo keys don't need quotes, regular keys do
+                    if is_combo_key(key):
+                        cmd = f'Send {key_code}'
+                    else:
+                        cmd = f'Send "{key_code}"'
                     self.image_server_client.send_script_command(cmd)
                     results.append(cmd)
                     
                 elif op_type == "wait":
                     duration = op.get("duration", 0.5)
                     time.sleep(duration)
+
+                elif op_type == "move_mouse":
+                    norm_x = op.get("norm_x", 0)
+                    norm_y = op.get("norm_y", 0)
+                    pixel_x, pixel_y = self.coord_converter.denormalize_coordinates(norm_x, norm_y, image_path)
+                    hid_x, hid_y = self.coord_converter.pixel_to_hid(pixel_x, pixel_y)
+                    cmd = f'MouseMove {hid_x},{hid_y}'
+                    self.image_server_client.send_script_command(cmd)
+                    results.append(cmd)
+
+                elif op_type == "triple_click":
+                    norm_x = op.get("norm_x", 0)
+                    norm_y = op.get("norm_y", 0)
+                    pixel_x, pixel_y = self.coord_converter.denormalize_coordinates(norm_x, norm_y, image_path)
+                    hid_x, hid_y = self.coord_converter.pixel_to_hid(pixel_x, pixel_y)
+                    for i in range(3):
+                        self.image_server_client.send_script_command(f'Click {hid_x},{hid_y}')
+                        results.append(f'Click {hid_x},{hid_y}')
+                        if i < 2:
+                            time.sleep(Config.TRIPLE_CLICK_INTERVAL)
+
+                elif op_type == "lock_state":
+                    lock_type = op.get("lock_type", "CapsLock")
+                    state = op.get("state", "On")
+                    cmd = f'Set{lock_type}State {state}'
+                    self.image_server_client.send_script_command(cmd)
+                    results.append(cmd)
+
+                elif op_type == "screenshot":
+                    path = op.get("path", "/tmp/screenshot.png")
+                    cmd = f'FullScreenCapture "{path}"'
+                    self.image_server_client.send_script_command(cmd)
+                    results.append(cmd)
                 
                 # Delay between operations
                 time.sleep(0.3)
@@ -681,11 +737,8 @@ class CommandBuilder:
             不是嵌入式命令 Send "{Click x,y}"
             独立 Click 命令使用 50ms 延迟，嵌入式使用 5ms 延迟
         """
-        # 坐标转换
+        # 坐标转换（Y offset 已内置在 pixel_to_hid 中）
         hid_x, hid_y = self.executor.coord_converter.pixel_to_hid(x, y)
-
-        # 应用坐标偏移（与现有 executor.py 保持一致）
-        hid_y -= 10
 
         # 标准化按钮名称
         button = button.lower() if button else "left"
@@ -731,8 +784,7 @@ class CommandBuilder:
         """
         hid_x, hid_y = self.executor.coord_converter.pixel_to_hid(x, y)
 
-        # 应用坐标偏移
-        hid_y -= 10
+        # Y offset 已内置在 pixel_to_hid 中
 
         # 第一次点击
         self.commands.append(f'Click {hid_x},{hid_y}')
@@ -786,29 +838,32 @@ class CommandBuilder:
         delay: float = 0.3
     ) -> 'CommandBuilder':
         """
-        添加按键命令
+        添加按键命令（支持普通键和组合键）
 
         Args:
-            key: 键名（支持多种格式）
+            key: 键名或组合键字符串
+                普通键: 'Enter', 'Tab', 'Escape', 'Backspace', 'Delete', 'Up', 'Down', 'F1'..'F12'
+                组合键: '^c' (Ctrl+C), '^v' (Ctrl+V), '^a' (Ctrl+A), '!F4' (Alt+F4),
+                       '#e' (Win+E), '^+esc' (Ctrl+Shift+Esc)
             delay: 按键后延迟
 
         Returns:
             self
 
-        Supported Key Names:
-            - 标准：'Enter', 'Tab', 'Escape', 'Backspace', 'Delete'
-            - 方向：'Up', 'Down', 'Left', 'Right'
-            - 功能：'F1' - 'F12'
-            - 控制：'Ctrl', 'Alt', 'Shift', 'Win'
-            - 其他：'Space', 'PrintScreen', 'ScrollLock', 'Pause'
+        Prefix Notation:
+            ^ = Ctrl, + = Shift, ! = Alt, # = Win
 
         Example:
-            builder.press_key("Enter").press_key("Tab").press_key("F5")
+            builder.press_key("Enter").press_key("^c").press_key("!F4")
         """
         try:
             # 获取 TCP 格式键码
             key_code = get_tcp_key_code(key)
-            cmd = f'Send "{key_code}"'
+            # 组合键不需要引号，普通键需要引号
+            if is_combo_key(key):
+                cmd = f'Send {key_code}'
+            else:
+                cmd = f'Send "{key_code}"'
             self.commands.append(cmd)
             self.delays.append(delay)
         except KeyError as e:
@@ -832,6 +887,121 @@ class CommandBuilder:
         # 使用空命令作为占位符，实际上通过延迟实现
         self.commands.append("")
         self.delays.append(duration)
+        return self
+
+    def move_mouse(
+        self,
+        x: int,
+        y: int,
+        delay: float = 0.2
+    ) -> 'CommandBuilder':
+        """
+        添加鼠标移动命令（不点击）
+
+        Args:
+            x: 像素坐标 X
+            y: 像素坐标 Y
+            delay: 移动后延迟
+
+        Returns:
+            self
+
+        Example:
+            builder.move_mouse(960, 540)  # 移动到屏幕中心
+        """
+        hid_x, hid_y = self.executor.coord_converter.pixel_to_hid(x, y)
+        cmd = f'MouseMove {hid_x},{hid_y}'
+        self.commands.append(cmd)
+        self.delays.append(delay)
+        return self
+
+    def triple_click(
+        self,
+        x: int,
+        y: int,
+        delay: float = 0.3
+    ) -> 'CommandBuilder':
+        """
+        添加三击命令（选中整行/整段文本）
+
+        Args:
+            x: 像素坐标 X
+            y: 像素坐标 Y
+            delay: 第三次点击后延迟
+
+        Returns:
+            self
+
+        Example:
+            builder.triple_click(960, 540)  # 三击选中整段
+        """
+        hid_x, hid_y = self.executor.coord_converter.pixel_to_hid(x, y)
+
+        # 三次点击
+        for i in range(3):
+            self.commands.append(f'Click {hid_x},{hid_y}')
+            if i < 2:
+                self.delays.append(Config.TRIPLE_CLICK_INTERVAL)
+            else:
+                self.delays.append(delay)
+
+        return self
+
+    def set_lock_state(
+        self,
+        lock_type: str,
+        state: str,
+        delay: float = 0.3
+    ) -> 'CommandBuilder':
+        """
+        设置锁定键状态（CapsLock/NumLock/ScrollLock）
+
+        Args:
+            lock_type: 锁定键类型 ("CapsLock", "NumLock", "ScrollLock")
+            state: 目标状态 ("On", "Off", "Toggle")
+            delay: 操作后延迟
+
+        Returns:
+            self
+
+        Example:
+            builder.set_lock_state("CapsLock", "On")
+            builder.set_lock_state("NumLock", "Off")
+        """
+        valid_types = ["CapsLock", "NumLock", "ScrollLock"]
+        valid_states = ["On", "Off", "Toggle"]
+        if lock_type not in valid_types:
+            print(f"Warning: Invalid lock_type '{lock_type}', must be one of {valid_types}")
+            return self
+        if state not in valid_states:
+            print(f"Warning: Invalid state '{state}', must be one of {valid_states}")
+            return self
+        cmd = f'Set{lock_type}State {state}'
+        self.commands.append(cmd)
+        self.delays.append(delay)
+        return self
+
+    def full_screen_capture(
+        self,
+        path: str,
+        delay: float = 0.5
+    ) -> 'CommandBuilder':
+        """
+        添加全屏截图命令
+
+        Args:
+            path: 截图保存路径
+            delay: 截图后延迟
+
+        Returns:
+            self
+
+        Example:
+            builder.full_screen_capture("/tmp/screenshot.png")
+        """
+        cmd = f'FullScreenCapture "{path}"'
+        self.commands.append(cmd)
+        self.delays.append(delay)
         return self
 
     def build(self) -> List[Dict]:

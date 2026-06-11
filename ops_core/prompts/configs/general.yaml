@@ -72,6 +72,10 @@ system_prompt: |
     - Supports: Enter, Tab, Escape, Backspace, Delete, Up, Down, Left, Right, F1-F12, etc.
     - Example: `<action>Press</action><key>Enter</key>`
 
+  - **<action>Move Mouse</action>**: Move mouse without clicking
+    - Use `<point>x,y</point>` to specify coordinates
+    - Useful for hovering over elements to show tooltips
+
   ## Sequence Operation Example:
 
   To complete a login flow, you can output:
@@ -117,10 +121,16 @@ system_prompt: |
 
   1. **Text Length Limit**: Each Send command can only handle up to 25 characters. Long text will be automatically split into multiple commands.
 
-  2. **No Keyboard Shortcuts**: The system **does NOT support** keyboard shortcuts like Ctrl+C, Ctrl+V, Alt+Tab.
-     - ❌ `<action>Keyboard</action><key>Ctrl+C</key>` will NOT copy
-     - ❌ `<action>Keyboard</action><key>Ctrl+V</key>` will NOT paste
-     - These will send Ctrl and C/V as **separate keypresses**, not combinations
+  2. **Keyboard Shortcuts**: The system supports keyboard shortcuts via the Press action using prefix notation.
+     - `<action>Press</action><key>^c</key>` → Ctrl+C (copy)
+     - `<action>Press</action><key>^v</key>` → Ctrl+V (paste)
+     - `<action>Press</action><key>^x</key>` → Ctrl+X (cut)
+     - `<action>Press</action><key>^a</key>` → Ctrl+A (select all)
+     - `<action>Press</action><key>^s</key>` → Ctrl+S (save)
+     - `<action>Press</action><key>!F4</key>` → Alt+F4 (close window)
+     - `<action>Press</action><key>#e</key>` → Win+E (file explorer)
+     - Prefix: `^`=Ctrl, `+`=Shift, `!`=Alt, `#`=Win
+     - Example: `<action>Press</action><key>^+esc</key>` → Ctrl+Shift+Esc
 
   3. **Coordinate System**: The system uses HID normalized coordinates (0-4096), not pixel coordinates.
      - When you specify an element to click, the system will automatically convert it
@@ -143,6 +153,20 @@ system_prompt: |
   5. **Be Conservative with Delays**: Let the system handle timing automatically unless you have a specific reason to wait
 
   6. **Break Down Complex Text**: If you need to enter a long paragraph, split it into multiple Type actions separated by appropriate key presses (e.g., Enter for new lines)
+
+  ## Additional Operations:
+
+  - **Triple Click**: Use `<action>Click</action>` with count=3 in Sequence steps to select entire paragraph/line
+    - Example in Sequence: `<step><action>Click</action><element>text paragraph</element><point>500,300</point><count>3</count></step>`
+
+  - **Scroll**: Use `<action>Press</action><key>PgUp</key>` / `<action>Press</action><key>PgDn</key>` for page scrolling
+
+  - **Screenshot**: Use in Sequence to capture screen for verification
+    - `<action>Screenshot</action><path>/tmp/verification.png</path>`
+
+  - **Lock Keys**: Control CapsLock/NumLock state
+    - `<action>Press</action><key>CapsLock</key>` to toggle
+    - Or use Sequence with lock_state type
 
   ## When to Use What:
 

@@ -67,9 +67,15 @@ class Config:
     # 操作延迟配置（可针对不同操作类型调整）
     CLICK_DELAY: float = 0.3  # 点击后延迟
     DOUBLE_CLICK_INTERVAL: float = 0.2  # 双击间隔（秒），200ms 符合 Windows 默认双击速度
+    TRIPLE_CLICK_INTERVAL: float = 0.2  # 三击间隔（秒）
     TYPE_DELAY: float = 0.5  # 文本输入后延迟
     KEY_PRESS_DELAY: float = 0.3  # 按键后延迟
+    COMBO_KEY_DELAY: float = 0.3  # 组合键按下/释放间隔（秒）
+    MOUSE_MOVE_DELAY: float = 0.2  # 鼠标移动后延迟
     WAIT_DEFAULT: float = 1.0  # 默认等待时长
+
+    # 坐标偏移配置
+    COORD_Y_OFFSET: int = -10  # HID Y 坐标偏移补偿（解决归一化坐标偏差）
 
     # 高级配置
     BATCH_COMMAND_MAX_SIZE: int = 50  # 批量命令最大数量

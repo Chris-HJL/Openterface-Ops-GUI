@@ -135,6 +135,9 @@ class CoordinateConverter:
         hid_x = int(round(x * self.HID_MAX_X / width))
         hid_y = int(round(y * self.HID_MAX_Y / height))
 
+        # Apply Y offset compensation (from config)
+        hid_y += Config.COORD_Y_OFFSET
+
         # Clamp to valid HID range (0-4096)
         hid_x = max(0, min(self.HID_MAX_X, hid_x))
         hid_y = max(0, min(self.HID_MAX_Y, hid_y))
