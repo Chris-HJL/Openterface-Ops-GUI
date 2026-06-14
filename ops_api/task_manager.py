@@ -738,6 +738,21 @@ class ReActTaskManager:
                     else:
                         logger.error(f"[TaskManager] Press action failed: {result}")
                         execution_error = str(result)
+                elif action == "Wait":
+                    logger.info(f"[TaskManager] Waiting as instructed by reasoning...")
+                    execution_success = True
+                    execution_result = "Wait completed"
+
+                    # Capture screenshot during wait to show current state
+                    try:
+                        executor = task.session.get_command_executor()
+                        screenshot_path = executor.capture_screenshot("wait_state")
+                        if screenshot_path and os.path.exists(screenshot_path):
+                            current_image_base64 = image_to_base64(screenshot_path)
+                            task.iteration_images.append(current_image_base64)
+                            logger.info(f"[TaskManager] Wait state screenshot captured: {screenshot_path}")
+                    except Exception as e:
+                        logger.error(f"[TaskManager] Wait state screenshot capture failed: {str(e)}", exc_info=True)
 
                 # Update iteration record
                 iteration_record.execution_success = execution_success
@@ -763,11 +778,12 @@ class ReActTaskManager:
                     task.stop()
                     return
 
-                # Wait for system to respond
-                logger.info(f"[TaskManager] Waiting for system to respond...")
+                # Wait for system to respond (dynamic based on action type)
+                wait_seconds = 3 if action == "Wait" else 1
+                logger.info(f"[TaskManager] Waiting {wait_seconds}s for system to respond (action: {action})...")
 
-                # Wait in segments, check stop flag every second
-                for _ in range(3):
+                # Wait in segments, check stop flag each second
+                for _ in range(wait_seconds):
                     if task.should_stop:
                         logger.info(f"[TaskManager] Task stop requested during wait")
                         task.stop()

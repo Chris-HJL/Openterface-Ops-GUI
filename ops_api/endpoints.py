@@ -1062,6 +1062,20 @@ async def react(request: ReactRequest):
                         logger.info(f"[ReAct] Keyboard screenshot captured: {screenshot_path}")
                 except Exception as e:
                     logger.error(f"[ReAct] Keyboard screenshot capture failed: {str(e)}", exc_info=True)
+            elif action == "Wait":
+                logger.info(f"[ReAct] Waiting as instructed by reasoning...")
+                execution_success = True
+                execution_result = "Wait completed"
+
+                # Capture screenshot during wait to show current state
+                try:
+                    executor = session.get_command_executor()
+                    screenshot_path = executor.capture_screenshot("wait_state")
+                    if screenshot_path and os.path.exists(screenshot_path):
+                        iteration_images.append(image_to_base64(screenshot_path))
+                        logger.info(f"[ReAct] Wait state screenshot captured: {screenshot_path}")
+                except Exception as e:
+                    logger.error(f"[ReAct] Wait state screenshot capture failed: {str(e)}", exc_info=True)
 
             # Update iteration record
             iteration_record.execution_success = execution_success
@@ -1070,10 +1084,11 @@ async def react(request: ReactRequest):
             session.react_memory_store.add_iteration(session.session_id, iteration_record)
             session.react_memory_store.update_patterns(session.session_id, iteration_record)
 
-            # Wait for system to respond
+            # Wait for system to respond (dynamic based on action type)
             import time
-            logger.info(f"[ReAct] Waiting for system to respond...")
-            time.sleep(3)
+            wait_seconds = 3 if action == "Wait" else 1
+            logger.info(f"[ReAct] Waiting {wait_seconds}s for system to respond (action: {action})...")
+            time.sleep(wait_seconds)
 
         # Maximum iterations reached
         logger.warning(f"[ReAct] Maximum iterations reached: {session.react_max_iterations}")
