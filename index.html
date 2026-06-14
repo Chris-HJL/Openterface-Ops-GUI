@@ -481,8 +481,8 @@
                 <div class="config-item">
                     <label for="scene-type">Scene Type:</label>
                     <select id="scene-type">
-                        <option value="auto" selected>Auto (VLM Detection)</option>
-                        <option value="general">General (Mixed/Unknown)</option>
+                        <option value="auto">Auto (VLM Detection)</option>
+                        <option value="general" selected>General (Mixed/Unknown)</option>
                         <option value="bios">BIOS/UEFI</option>
                         <option value="windows">Windows</option>
                         <option value="linux">Linux</option>
@@ -664,6 +664,13 @@ export LLM_API_KEY=your_llm_api_key</pre>
                     document.getElementById('original-image').src = '';
                     document.getElementById('processed-image').src = '';
                     document.querySelector('.image-section').classList.remove('active');
+
+                    // Clear operation screenshots from ReAct agent progress
+                    document.getElementById('react-images').innerHTML = '';
+
+                    // Clear progress bar
+                    document.getElementById('progress-fill').style.width = '0%';
+                    document.getElementById('progress-text').textContent = 'Ready';
 
                     // Clear error message
                     document.getElementById('error-message').textContent = '';
