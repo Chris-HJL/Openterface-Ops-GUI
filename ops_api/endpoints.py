@@ -103,6 +103,8 @@ class SessionManager:
                 session.api_url = request.api_url
             if request.model:
                 session.model = request.model
+            session.coord_offset_x = request.coord_offset_x
+            session.coord_offset_y = request.coord_offset_y
 
             self.sessions[session_id] = session
 

@@ -17,13 +17,21 @@ from ..utils.text_splitter import TextSplitter
 class CommandExecutor:
     """Command executor class"""
 
-    def __init__(self):
-        """Initialize command executor"""
+    def __init__(self, coord_offset_x: int = 0, coord_offset_y: int = 0):
+        """Initialize command executor
+
+        Args:
+            coord_offset_x: Pixel offset to apply to X coordinate after denormalization
+            coord_offset_y: Pixel offset to apply to Y coordinate after denormalization
+        """
         self.image_server_client = ImageServerClient()
         self.parser = ResponseParser()
         self.checkbox_detector = CheckboxDetector()
         # Coordinate converter - resolution will be loaded from images dynamically
         self.coord_converter = CoordinateConverter()
+        # Coordinate offsets (pixels) applied after denormalization
+        self.coord_offset_x = coord_offset_x
+        self.coord_offset_y = coord_offset_y
 
     def _is_checkbox_element(self, element: str) -> bool:
         """
@@ -93,10 +101,14 @@ class CommandExecutor:
             pixel_x, pixel_y = self.coord_converter.denormalize_coordinates(
                 norm_x, norm_y, image_path
             )
-            
+
+            # Apply coordinate offsets
+            pixel_x += self.coord_offset_x
+            pixel_y += self.coord_offset_y
+
             # Load resolution from image before coordinate conversion
             self.coord_converter.load_resolution_from_image(image_path)
-            
+
             # Convert pixel coordinates to HID coordinates for TCP command
             hid_x, hid_y = self.coord_converter.pixel_to_hid(pixel_x, pixel_y)
 
@@ -173,14 +185,18 @@ class CommandExecutor:
             pixel_x, pixel_y = self.coord_converter.denormalize_coordinates(
                 norm_x, norm_y, image_path
             )
-            
+
+            # Apply coordinate offsets
+            pixel_x += self.coord_offset_x
+            pixel_y += self.coord_offset_y
+
             # Load resolution from image
             self.coord_converter.load_resolution_from_image(image_path)
-            
+
             # Convert to HID coordinates (Y offset applied inside pixel_to_hid)
             hid_x, hid_y = self.coord_converter.pixel_to_hid(pixel_x, pixel_y)
 
-            print(f"[Executor] Input at point: normalized ({norm_x}, {norm_y}) -> HID ({hid_x}, {hid_y})")
+            print(f"[Executor] Input at point: normalized ({norm_x}, {norm_y}) -> pixel ({pixel_x}, {pixel_y}) -> HID ({hid_x}, {hid_y})")
             
             # First, click to focus the input field
             click_command = f'Click {hid_x},{hid_y}'
@@ -645,10 +661,14 @@ class CommandExecutor:
                     norm_x = op.get("norm_x", 0)
                     norm_y = op.get("norm_y", 0)
                     button = op.get("button", "left")
-                    
+
                     # Normalize to pixel
                     pixel_x, pixel_y = self.coord_converter.denormalize_coordinates(norm_x, norm_y, image_path)
-                    
+
+                    # Apply coordinate offsets
+                    pixel_x += self.coord_offset_x
+                    pixel_y += self.coord_offset_y
+
                     # Pixel to HID (Y offset applied inside pixel_to_hid)
                     hid_x, hid_y = self.coord_converter.pixel_to_hid(pixel_x, pixel_y)
 
@@ -656,15 +676,17 @@ class CommandExecutor:
                         cmd = f'Click {hid_x},{hid_y}'
                     else:
                         cmd = f'Click {hid_x},{hid_y} {button}'
-                    
+
                     self.image_server_client.send_script_command(cmd)
                     results.append(cmd)
-                    
+
                 elif op_type == "double_click":
                     norm_x = op.get("norm_x", 0)
                     norm_y = op.get("norm_y", 0)
-                    
+
                     pixel_x, pixel_y = self.coord_converter.denormalize_coordinates(norm_x, norm_y, image_path)
+                    pixel_x += self.coord_offset_x
+                    pixel_y += self.coord_offset_y
                     hid_x, hid_y = self.coord_converter.pixel_to_hid(pixel_x, pixel_y)
 
                     commands = [f'Click {hid_x},{hid_y}', f'Click {hid_x},{hid_y}']
@@ -704,6 +726,8 @@ class CommandExecutor:
                     norm_x = op.get("norm_x", 0)
                     norm_y = op.get("norm_y", 0)
                     pixel_x, pixel_y = self.coord_converter.denormalize_coordinates(norm_x, norm_y, image_path)
+                    pixel_x += self.coord_offset_x
+                    pixel_y += self.coord_offset_y
                     hid_x, hid_y = self.coord_converter.pixel_to_hid(pixel_x, pixel_y)
                     cmd = f'MouseMove {hid_x},{hid_y}'
                     self.image_server_client.send_script_command(cmd)
@@ -713,6 +737,8 @@ class CommandExecutor:
                     norm_x = op.get("norm_x", 0)
                     norm_y = op.get("norm_y", 0)
                     pixel_x, pixel_y = self.coord_converter.denormalize_coordinates(norm_x, norm_y, image_path)
+                    pixel_x += self.coord_offset_x
+                    pixel_y += self.coord_offset_y
                     hid_x, hid_y = self.coord_converter.pixel_to_hid(pixel_x, pixel_y)
                     for i in range(3):
                         self.image_server_client.send_script_command(f'Click {hid_x},{hid_y}')

@@ -27,6 +27,9 @@ class Session:
         # API configuration
         self.api_url = Config.DEFAULT_API_URL
         self.model = Config.DEFAULT_MODEL
+        # Coordinate offset (pixels) applied after denormalization
+        self.coord_offset_x: int = 0
+        self.coord_offset_y: int = 5
         # Current image path
         self.current_image_path: Optional[str] = None
         # ReAct agent configuration
@@ -71,7 +74,10 @@ class Session:
     def get_command_executor(self) -> CommandExecutor:
         """Get or create CommandExecutor instance"""
         if self._command_executor is None:
-            self._command_executor = CommandExecutor()
+            self._command_executor = CommandExecutor(
+                coord_offset_x=self.coord_offset_x,
+                coord_offset_y=self.coord_offset_y
+            )
         return self._command_executor
 
     def invalidate_clients(self):

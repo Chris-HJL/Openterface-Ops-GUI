@@ -9,6 +9,8 @@ class CreateSessionRequest(BaseModel):
     language: Optional[str] = "en"
     api_url: Optional[str] = None
     model: Optional[str] = None
+    coord_offset_x: Optional[int] = 0
+    coord_offset_y: Optional[int] = 5
 
 class ChatRequest(BaseModel):
     session_id: str

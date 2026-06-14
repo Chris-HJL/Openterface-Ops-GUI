@@ -489,6 +489,18 @@
                         <option value="os_installation">OS Installation</option>
                     </select>
                 </div>
+                <div class="config-item">
+                    <label for="coord-offset-x">Coordinate X Offset (px):</label>
+                    <input type="number" id="coord-offset-x" value="0" step="1">
+                </div>
+                <div class="config-item">
+                    <label for="coord-offset-y">Coordinate Y Offset (px):</label>
+                    <input type="number" id="coord-offset-y" value="5" step="1">
+                </div>
+                <div class="config-item" style="flex-direction: row; align-items: center;">
+                    <input type="checkbox" id="allow-dangerous-actions" style="width: auto; margin-right: 8px; margin-bottom: 0; padding: 0; border: none; font-size: 16px;">
+                    <label for="allow-dangerous-actions">Allow All Dangerous Actions</label>
+                </div>
             </div>
             <div style="margin-top: 15px; padding: 15px; background-color: #f5f5f5; border-radius: 4px;">
                 <h4>API Key Configuration</h4>
@@ -604,6 +616,8 @@ export LLM_API_KEY=your_llm_api_key</pre>
                 // Get configuration from input fields
                 const apiUrl = document.getElementById('api-url').value;
                 const model = document.getElementById('model').value;
+                const coordOffsetX = parseInt(document.getElementById('coord-offset-x').value) || 0;
+                const coordOffsetY = parseInt(document.getElementById('coord-offset-y').value) || 0;
 
                 // Create session with configuration
                 const sessionResponse = await fetch(`${API_BASE_URL}/create-session`, {
@@ -614,7 +628,9 @@ export LLM_API_KEY=your_llm_api_key</pre>
                     body: JSON.stringify({
                         language: 'en',
                         api_url: apiUrl,
-                        model: model
+                        model: model,
+                        coord_offset_x: coordOffsetX,
+                        coord_offset_y: coordOffsetY
                     })
                 });
                 
@@ -1053,7 +1069,8 @@ Main API Status: ${data.api_status}`;
                 try {
                     // Get scene type from dropdown
                     const sceneType = document.getElementById('scene-type').value;
-                    
+                    const allowDangerous = document.getElementById('allow-dangerous-actions').checked;
+
                     // Create task
                     const createResponse = await fetch(`${API_BASE_URL}/react-task`, {
                         method: 'POST',
@@ -1064,7 +1081,7 @@ Main API Status: ${data.api_status}`;
                             session_id: sessionId,
                             task: task,
                             max_iterations: maxIterations,
-                            approval_policy: 'manual',
+                            approval_policy: allowDangerous ? 'auto' : 'manual',
                             scene_type: sceneType
                         })
                     });
