@@ -1149,6 +1149,18 @@ Main API Status: ${data.api_status}`;
                                     </div>
                                 `;
                                 addMessage(progressMessage, 'assistant');
+
+                                // Display operation image in real-time if available
+                                if (progressData.image) {
+                                    const reactImages = document.getElementById('react-images');
+                                    const imageItem = document.createElement('div');
+                                    imageItem.className = 'react-image-item';
+                                    imageItem.innerHTML = `
+                                        <img src="data:image/jpeg;base64,${progressData.image}" alt="Iteration ${progressData.iteration}">
+                                        <span>Iteration ${progressData.iteration}</span>
+                                    `;
+                                    reactImages.appendChild(imageItem);
+                                }
                                 
                             } else if (data.event === 'approval_required') {
                                 console.log('Entering approval_required branch');
@@ -1194,23 +1206,12 @@ Main API Status: ${data.api_status}`;
                                 }
                                 
                                 addMessage(completionMessage, 'assistant');
-                                
+
                                 document.getElementById('progress-fill').style.width = '100%';
                                 document.getElementById('progress-text').textContent = progressText;
-                                
-                                // Display iteration images
-                                if (completedData.images && completedData.images.length > 0) {
-                                    const reactImages = document.getElementById('react-images');
-                                    completedData.images.forEach((imgBase64, index) => {
-                                        const imageItem = document.createElement('div');
-                                        imageItem.className = 'react-image-item';
-                                        imageItem.innerHTML = `
-                                            <img src="data:image/jpeg;base64,${imgBase64}" alt="Iteration ${index + 1}">
-                                            <span>Iteration ${index + 1}</span>
-                                        `;
-                                        reactImages.appendChild(imageItem);
-                                    });
-                                }
+
+                                // Images are already displayed in real-time via progress events
+                                // No need to duplicate them here
                                 
                                 // Close event source
                                 currentEventSource.close();

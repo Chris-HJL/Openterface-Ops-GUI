@@ -585,6 +585,7 @@ class ReActTaskManager:
                 execution_success = False
                 execution_result = None
                 execution_error = None
+                current_image_base64 = None  # Current operation image for real-time display
 
                 # Check if this is a Sequence operation
                 if action == "Sequence":
@@ -608,17 +609,20 @@ class ReActTaskManager:
                             logger.info(f"[TaskManager] Sequence execution successful: {result}")
                             execution_success = True
                             execution_result = str(result)
+                            if isinstance(result, str) and os.path.exists(result):
+                                task.iteration_images.append(image_to_base64(result))
+                                current_image_base64 = image_to_base64(result)
                         else:
                             logger.error(f"[TaskManager] Sequence execution failed: {result}")
                             execution_error = str(result)
                     else:
                         logger.error(f"[TaskManager] No operations found in sequence")
                         execution_error = "Failed to parse sequence operations"
-                
+
                 elif action in ["Click", "Double Click", "Right Click"] and element and image_path:
                     logger.info(f"[TaskManager] Executing {action} on {element} at point {point_coords}")
                     executor = task.session.get_command_executor()
-                    
+
                     # Use point coordinates from LLM if available
                     if point_coords:
                         success, result = executor.execute_click_at_point(
@@ -630,20 +634,21 @@ class ReActTaskManager:
                         success, result = executor.process_ui_element_request(
                             image_path, element, action, element
                         )
-                    
+
                     if success:
                         logger.info(f"[TaskManager] UI action successful: {result}")
                         execution_success = True
                         execution_result = str(result)
                         if isinstance(result, str) and os.path.exists(result):
-                            task.iteration_images.append(image_to_base64(result))
+                            current_image_base64 = image_to_base64(result)
+                            task.iteration_images.append(current_image_base64)
                     else:
                         logger.error(f"[TaskManager] UI action failed: {result}")
                         execution_error = str(result)
                 elif action == "Input" and input_content:
                     logger.info(f"[TaskManager] Sending input: {input_content} at point {point_coords}")
                     executor = task.session.get_command_executor()
-                    
+
                     # If point coordinates are provided, click first then type
                     if point_coords:
                         success, result = executor.execute_input_at_point(
@@ -654,7 +659,8 @@ class ReActTaskManager:
                             execution_success = True
                             execution_result = str(result)
                             if isinstance(result, str) and os.path.exists(result):
-                                task.iteration_images.append(image_to_base64(result))
+                                current_image_base64 = image_to_base64(result)
+                                task.iteration_images.append(current_image_base64)
                         else:
                             logger.error(f"[TaskManager] Input action failed: {result}")
                             execution_error = str(result)
@@ -677,6 +683,17 @@ class ReActTaskManager:
                     logger.info(f"[TaskManager] Keyboard command sent: {script_command}")
                     execution_success = True
                     execution_result = "Keyboard command sent successfully"
+
+                    # Capture screenshot after keyboard operation
+                    try:
+                        executor = task.session.get_command_executor()
+                        screenshot_path = executor.capture_screenshot("keyboard_after")
+                        if screenshot_path and os.path.exists(screenshot_path):
+                            current_image_base64 = image_to_base64(screenshot_path)
+                            task.iteration_images.append(current_image_base64)
+                            logger.info(f"[TaskManager] Keyboard screenshot captured: {screenshot_path}")
+                    except Exception as e:
+                        logger.error(f"[TaskManager] Keyboard screenshot capture failed: {str(e)}", exc_info=True)
                 elif action == "Type" and input_content:
                     # Handle Type action (new action type for text input)
                     logger.info(f"[TaskManager] Sending Type action: {input_content}")
@@ -686,6 +703,16 @@ class ReActTaskManager:
                         logger.info(f"[TaskManager] Type action successful: {result}")
                         execution_success = True
                         execution_result = str(result)
+
+                        # Capture screenshot after type operation
+                        try:
+                            screenshot_path = executor.capture_screenshot("type_after")
+                            if screenshot_path and os.path.exists(screenshot_path):
+                                current_image_base64 = image_to_base64(screenshot_path)
+                                task.iteration_images.append(current_image_base64)
+                                logger.info(f"[TaskManager] Type screenshot captured: {screenshot_path}")
+                        except Exception as e:
+                            logger.error(f"[TaskManager] Type screenshot capture failed: {str(e)}", exc_info=True)
                     else:
                         logger.error(f"[TaskManager] Type action failed: {result}")
                         execution_error = str(result)
@@ -698,6 +725,16 @@ class ReActTaskManager:
                         logger.info(f"[TaskManager] Press action successful: {result}")
                         execution_success = True
                         execution_result = str(result)
+
+                        # Capture screenshot after press operation
+                        try:
+                            screenshot_path = executor.capture_screenshot("press_after")
+                            if screenshot_path and os.path.exists(screenshot_path):
+                                current_image_base64 = image_to_base64(screenshot_path)
+                                task.iteration_images.append(current_image_base64)
+                                logger.info(f"[TaskManager] Press screenshot captured: {screenshot_path}")
+                        except Exception as e:
+                            logger.error(f"[TaskManager] Press screenshot capture failed: {str(e)}", exc_info=True)
                     else:
                         logger.error(f"[TaskManager] Press action failed: {result}")
                         execution_error = str(result)
@@ -716,7 +753,8 @@ class ReActTaskManager:
                     element=element,
                     key_content=key_content,
                     reasoning=reasoning,
-                    task_status=task_status
+                    task_status=task_status,
+                    image=current_image_base64
                 )
 
                 # Check if need to stop

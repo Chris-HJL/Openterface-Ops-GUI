@@ -1,7 +1,7 @@
 """
 Command execution module
 """
-from typing import Tuple, List, Dict
+from typing import Tuple, List, Dict, Optional
 from PIL import Image
 import os
 import time
@@ -240,11 +240,36 @@ class CommandExecutor:
                 self.image_server_client.send_script_command(send_command)
                 if i < len(chunks) - 1:
                     time.sleep(splitter.delay_between_chunks)
-            
+
             return (True, output_path)
         
         except Exception as e:
             return (False, f"Error: {str(e)}")
+
+    def capture_screenshot(self, suffix: str = "after") -> Optional[str]:
+        """
+        Capture a screenshot after an operation and save to output directory.
+
+        Args:
+            suffix: Suffix for the output filename, e.g. "input_after", "keyboard_after"
+
+        Returns:
+            Path to the saved screenshot, or None if capture failed.
+        """
+        time.sleep(0.3)
+        screenshot_path = self.image_server_client.get_target_screen()
+        if screenshot_path.startswith("Error:"):
+            print(f"[Executor] Screenshot capture failed: {screenshot_path}")
+            return None
+        output_screenshot = os.path.join(
+            Config.OUTPUT_DIR,
+            f"screenshot_{suffix}_{int(time.time())}.jpg"
+        )
+        os.makedirs(Config.OUTPUT_DIR, exist_ok=True)
+        with open(screenshot_path, "rb") as src:
+            with open(output_screenshot, "wb") as dst:
+                dst.write(src.read())
+        return output_screenshot
 
     def execute_command_sequence(
         self,

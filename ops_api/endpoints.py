@@ -345,6 +345,16 @@ async def chat(request: ChatRequest):
         image_server_client.send_script_command(script_command)
         logger.info(f"[Chat] Keyboard command sent: {script_command}")
 
+        # Capture screenshot after keyboard operation
+        try:
+            executor = session.get_command_executor()
+            screenshot_path = executor.capture_screenshot("keyboard_after")
+            if screenshot_path and os.path.exists(screenshot_path):
+                processed_image = image_to_base64(screenshot_path)
+                logger.info(f"[Chat] Keyboard screenshot captured: {screenshot_path}")
+        except Exception as e:
+            logger.error(f"[Chat] Keyboard screenshot capture failed: {str(e)}", exc_info=True)
+
     # Clear current image path after processing
     session.current_image_path = None
 
@@ -492,7 +502,8 @@ async def react_stream(task_id: str):
                                 "key_content": progress_data.get("key_content"),
                                 "reasoning": progress_data.get("reasoning"),
                                 "task_status": progress_data.get("task_status"),
-                                "image_path": progress_data.get("image_path")
+                                "image_path": progress_data.get("image_path"),
+                                "image": progress_data.get("image")
                             }
                         }
                         yield f"data: {json.dumps(data)}\n\n"
@@ -1019,6 +1030,16 @@ async def react(request: ReactRequest):
                 logger.info(f"[ReAct] Input sent successfully")
                 execution_success = True
                 execution_result = "Input sent successfully"
+
+                # Capture screenshot after input operation
+                try:
+                    executor = session.get_command_executor()
+                    screenshot_path = executor.capture_screenshot("input_after")
+                    if screenshot_path and os.path.exists(screenshot_path):
+                        iteration_images.append(image_to_base64(screenshot_path))
+                        logger.info(f"[ReAct] Input screenshot captured: {screenshot_path}")
+                except Exception as e:
+                    logger.error(f"[ReAct] Input screenshot capture failed: {str(e)}", exc_info=True)
             elif action == "Keyboard" and key_content:
                 logger.info(f"[ReAct] Sending keyboard key: {key_content}")
                 from ops_core.utils.key_map import is_combo_key, get_tcp_key_code
@@ -1031,6 +1052,16 @@ async def react(request: ReactRequest):
                 logger.info(f"[ReAct] Keyboard command sent: {script_command}")
                 execution_success = True
                 execution_result = "Keyboard command sent successfully"
+
+                # Capture screenshot after keyboard operation
+                try:
+                    executor = session.get_command_executor()
+                    screenshot_path = executor.capture_screenshot("keyboard_after")
+                    if screenshot_path and os.path.exists(screenshot_path):
+                        iteration_images.append(image_to_base64(screenshot_path))
+                        logger.info(f"[ReAct] Keyboard screenshot captured: {screenshot_path}")
+                except Exception as e:
+                    logger.error(f"[ReAct] Keyboard screenshot capture failed: {str(e)}", exc_info=True)
 
             # Update iteration record
             iteration_record.execution_success = execution_success
