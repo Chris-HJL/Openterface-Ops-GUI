@@ -312,6 +312,85 @@ class CommandExecutor:
 
         return (False, f"All {max_retries} retry attempts failed: {message}")
 
+    def type_text(
+        self,
+        text: str,
+        delay: float = 0.5
+    ) -> Tuple[bool, str]:
+        """
+        执行文本输入命令
+
+        Args:
+            text: 要输入的文本（>25 字符会自动拆分）
+            delay: 输入完成后延迟
+
+        Returns:
+            (success, message)
+
+        Note:
+            长文本会自动拆分为多个 Send 命令，每个≤25 字符
+            块间延迟固定为 0.3 秒
+        """
+        try:
+            # 使用文本拆分器
+            splitter = TextSplitter(max_length=25, delay_between_chunks=0.3)
+
+            # 拆分文本
+            chunks = splitter.split(text)
+
+            # 构建命令序列
+            sequence = []
+            for i, chunk in enumerate(chunks):
+                sequence.append({
+                    "command": f'Send "{chunk}"',
+                    "delay": delay if i == len(chunks) - 1 else splitter.delay_between_chunks
+                })
+
+            # 执行命令序列
+            return self.execute_command_sequence(sequence)
+        except Exception as e:
+            return (False, f"Failed to type text: {e}")
+
+    def press_key(
+        self,
+        key: str,
+        delay: float = 0.3
+    ) -> Tuple[bool, str]:
+        """
+        执行按键命令（支持普通键和组合键）
+
+        Args:
+            key: 键名或组合键字符串
+                普通键: 'Enter', 'Tab', 'Escape', 'Backspace', 'Delete', 'Up', 'Down', 'F1'..'F12'
+                组合键: '^c' (Ctrl+C), '^v' (Ctrl+V), '^a' (Ctrl+A), '!F4' (Alt+F4),
+                       '#e' (Win+E), '^+esc' (Ctrl+Shift+Esc)
+            delay: 按键后延迟
+
+        Returns:
+            (success, message)
+
+        Prefix Notation:
+            ^ = Ctrl, + = Shift, ! = Alt, # = Win
+        """
+        try:
+            # 获取 TCP 格式键码
+            key_code = get_tcp_key_code(key)
+            # 组合键不需要引号，普通键需要引号
+            if is_combo_key(key):
+                cmd = f'Send {key_code}'
+            else:
+                cmd = f'Send "{key_code}"'
+
+            # 构建命令序列
+            sequence = [{"command": cmd, "delay": delay}]
+
+            # 执行命令
+            return self.execute_command_sequence(sequence)
+        except KeyError as e:
+            return (False, f"Unknown key: {e}")
+        except Exception as e:
+            return (False, f"Failed to press key: {e}")
+
     def execute_mixed_operation(
         self,
         image_path: str,

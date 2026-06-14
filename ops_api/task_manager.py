@@ -665,9 +665,14 @@ class ReActTaskManager:
                         execution_result = "Input sent successfully"
                 elif action == "Keyboard" and key_content:
                     logger.info(f"[TaskManager] Sending keyboard key: {key_content}")
-                    script_command = f'Send "{{{key_content}}}"'
+                    from ops_core.utils.key_map import is_combo_key, get_tcp_key_code
+                    key_code = get_tcp_key_code(key_content)
+                    if is_combo_key(key_content):
+                        script_command = f'Send {key_code}'
+                    else:
+                        script_command = f'Send "{key_code}"'
                     image_server_client.send_script_command(script_command)
-                    logger.info(f"[TaskManager] Keyboard command sent successfully")
+                    logger.info(f"[TaskManager] Keyboard command sent: {script_command}")
                     execution_success = True
                     execution_result = "Keyboard command sent successfully"
                 elif action == "Type" and input_content:

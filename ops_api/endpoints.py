@@ -330,10 +330,15 @@ async def chat(request: ChatRequest):
     elif action == "Keyboard" and key_content:
         # Process Keyboard action - send key command
         logger.info(f"[Chat] Sending keyboard key: {key_content}")
+        from ops_core.utils.key_map import is_combo_key, get_tcp_key_code
+        key_code = get_tcp_key_code(key_content)
+        if is_combo_key(key_content):
+            script_command = f'Send {key_code}'
+        else:
+            script_command = f'Send "{key_code}"'
         image_server_client = session.image_server_client
-        script_command = f'Send "{{{key_content}}}"'
         image_server_client.send_script_command(script_command)
-        logger.info(f"[Chat] Keyboard command sent successfully")
+        logger.info(f"[Chat] Keyboard command sent: {script_command}")
 
     # Clear current image path after processing
     session.current_image_path = None
@@ -1011,9 +1016,14 @@ async def react(request: ReactRequest):
                 execution_result = "Input sent successfully"
             elif action == "Keyboard" and key_content:
                 logger.info(f"[ReAct] Sending keyboard key: {key_content}")
-                script_command = f'Send "{{{key_content}}}"'
+                from ops_core.utils.key_map import is_combo_key, get_tcp_key_code
+                key_code = get_tcp_key_code(key_content)
+                if is_combo_key(key_content):
+                    script_command = f'Send {key_code}'
+                else:
+                    script_command = f'Send "{key_code}"'
                 image_server_client.send_script_command(script_command)
-                logger.info(f"[ReAct] Keyboard command sent successfully")
+                logger.info(f"[ReAct] Keyboard command sent: {script_command}")
                 execution_success = True
                 execution_result = "Keyboard command sent successfully"
 
