@@ -653,6 +653,8 @@ class ReActTaskManager:
                             logger.info(f"[TaskManager] Input action successful: {result}")
                             execution_success = True
                             execution_result = str(result)
+                            if isinstance(result, str) and os.path.exists(result):
+                                task.iteration_images.append(image_to_base64(result))
                         else:
                             logger.error(f"[TaskManager] Input action failed: {result}")
                             execution_error = str(result)

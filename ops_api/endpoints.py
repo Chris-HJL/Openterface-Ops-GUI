@@ -319,6 +319,9 @@ async def chat(request: ChatRequest):
                 )
                 if success:
                     logger.info(f"[Chat] Input action successful: {result}")
+                    if isinstance(result, str) and os.path.exists(result):
+                        processed_image = image_to_base64(result)
+                        logger.info(f"[Chat] Processed image generated: {result}")
                 else:
                     logger.error(f"[Chat] Input action failed: {result}")
             else:

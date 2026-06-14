@@ -77,6 +77,49 @@ class CommandExecutor:
             return refined
         return (point_x, point_y)
 
+    def _draw_point_annotation(
+        self,
+        image_path: str,
+        pixel_x: int,
+        pixel_y: int,
+        action_suffix: str
+    ) -> str:
+        """
+        在截图上以指定像素坐标为中心画 50x50 红色矩形标注
+
+        Args:
+            image_path: 截图路径
+            pixel_x: 像素 X 坐标
+            pixel_y: 像素 Y 坐标
+            action_suffix: 输出文件名后缀，如 "clicked"、"input"、"moved"
+
+        Returns:
+            标注后的输出图片路径
+        """
+        base_name = os.path.basename(image_path)
+        name, ext = os.path.splitext(base_name)
+        output_path = os.path.join(Config.OUTPUT_DIR, f"{name}_{action_suffix}{ext}")
+
+        box_size = 50
+        left = pixel_x - box_size // 2
+        top = pixel_y - box_size // 2
+        right = pixel_x + box_size // 2
+        bottom = pixel_y + box_size // 2
+
+        width, height = Image.open(image_path).size
+        left = max(0, left)
+        top = max(0, top)
+        right = min(width - 1, right)
+        bottom = min(height - 1, bottom)
+
+        ImageDrawer.draw_rectangle(
+            image_path,
+            (left, top),
+            (right, bottom),
+            output_path
+        )
+        return output_path
+
     def execute_click_at_point(
         self,
         image_path: str,
@@ -115,31 +158,10 @@ class CommandExecutor:
             # Y offset is now applied inside coord_converter.pixel_to_hid()
 
             print(f"[Executor] Coordinate conversion: normalized ({norm_x}, {norm_y}) -> pixel ({pixel_x}, {pixel_y}) -> HID ({hid_x}, {hid_y})")
-            
+
             # Draw rectangle on image for visualization
-            base_name = os.path.basename(image_path)
-            name, ext = os.path.splitext(base_name)
-            output_path = os.path.join(Config.OUTPUT_DIR, f"{name}_clicked{ext}")
-            
-            box_size = 50
-            left = pixel_x - box_size // 2
-            top = pixel_y - box_size // 2
-            right = pixel_x + box_size // 2
-            bottom = pixel_y + box_size // 2
-            
-            width, height = Image.open(image_path).size
-            left = max(0, left)
-            top = max(0, top)
-            right = min(width - 1, right)
-            bottom = min(height - 1, bottom)
-            
-            ImageDrawer.draw_rectangle(
-                image_path,
-                (left, top),
-                (right, bottom),
-                output_path
-            )
-            
+            output_path = self._draw_point_annotation(image_path, pixel_x, pixel_y, "clicked")
+
             # Send TCP command
             if action == "Click":
                 script_command = f'Click {hid_x},{hid_y}'
@@ -197,7 +219,10 @@ class CommandExecutor:
             hid_x, hid_y = self.coord_converter.pixel_to_hid(pixel_x, pixel_y)
 
             print(f"[Executor] Input at point: normalized ({norm_x}, {norm_y}) -> pixel ({pixel_x}, {pixel_y}) -> HID ({hid_x}, {hid_y})")
-            
+
+            # Draw rectangle on image for visualization
+            output_path = self._draw_point_annotation(image_path, pixel_x, pixel_y, "input")
+
             # First, click to focus the input field
             click_command = f'Click {hid_x},{hid_y}'
             self.image_server_client.send_script_command(click_command)
@@ -216,7 +241,7 @@ class CommandExecutor:
                 if i < len(chunks) - 1:
                     time.sleep(splitter.delay_between_chunks)
             
-            return (True, f"Input executed successfully at ({norm_x}, {norm_y})")
+            return (True, output_path)
         
         except Exception as e:
             return (False, f"Error: {str(e)}")
@@ -652,10 +677,11 @@ class CommandExecutor:
             self.coord_converter.load_resolution_from_image(image_path)
             
             results = []
-            
+            annotated_paths = []
+
             for op in operations:
                 op_type = op.get("type", "").lower()
-                
+
                 if op_type == "click":
                     # Convert normalized coordinates to HID
                     norm_x = op.get("norm_x", 0)
@@ -679,6 +705,7 @@ class CommandExecutor:
 
                     self.image_server_client.send_script_command(cmd)
                     results.append(cmd)
+                    annotated_paths.append(self._draw_point_annotation(image_path, pixel_x, pixel_y, "clicked"))
 
                 elif op_type == "double_click":
                     norm_x = op.get("norm_x", 0)
@@ -694,7 +721,8 @@ class CommandExecutor:
                         commands, delay=Config.DOUBLE_CLICK_INTERVAL
                     )
                     results.extend(commands)
-                    
+                    annotated_paths.append(self._draw_point_annotation(image_path, pixel_x, pixel_y, "double_clicked"))
+
                 elif op_type == "type":
                     text = op.get("text", "")
                     splitter = TextSplitter(max_length=25, delay_between_chunks=0.3)
@@ -732,6 +760,7 @@ class CommandExecutor:
                     cmd = f'MouseMove {hid_x},{hid_y}'
                     self.image_server_client.send_script_command(cmd)
                     results.append(cmd)
+                    annotated_paths.append(self._draw_point_annotation(image_path, pixel_x, pixel_y, "moved"))
 
                 elif op_type == "triple_click":
                     norm_x = op.get("norm_x", 0)
@@ -745,6 +774,7 @@ class CommandExecutor:
                         results.append(f'Click {hid_x},{hid_y}')
                         if i < 2:
                             time.sleep(Config.TRIPLE_CLICK_INTERVAL)
+                    annotated_paths.append(self._draw_point_annotation(image_path, pixel_x, pixel_y, "triple_clicked"))
 
                 elif op_type == "lock_state":
                     lock_type = op.get("lock_type", "CapsLock")
@@ -762,6 +792,8 @@ class CommandExecutor:
                 # Delay between operations
                 time.sleep(0.3)
             
+            if annotated_paths:
+                return (True, annotated_paths[-1])
             return (True, f"Successfully executed {len(results)} operations")
         
         except Exception as e:
