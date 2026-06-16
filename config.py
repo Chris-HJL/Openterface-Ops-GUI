@@ -72,6 +72,7 @@ class Config:
     KEY_PRESS_DELAY: float = 0.3  # 按键后延迟
     COMBO_KEY_DELAY: float = 0.3  # 组合键按下/释放间隔（秒）
     MOUSE_MOVE_DELAY: float = 0.2  # 鼠标移动后延迟
+    SCROLL_DELAY: float = 0.1  # 滚轮操作后延迟（秒）
     WAIT_DEFAULT: float = 1.0  # 默认等待时长
 
     # 坐标偏移配置

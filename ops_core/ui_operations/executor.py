@@ -183,6 +183,37 @@ class CommandExecutor:
         except Exception as e:
             return (False, f"Error: {str(e)}")
 
+    def execute_move_mouse(
+        self,
+        image_path: str,
+        point_coords: Tuple[int, int]
+    ) -> Tuple[bool, str]:
+        """
+        移动鼠标到指定坐标（不点击）
+
+        Args:
+            image_path: 图像文件路径
+            point_coords: 归一化坐标 (norm_x, norm_y) 范围 0-1000
+
+        Returns:
+            Tuple (success, message)
+        """
+        try:
+            norm_x, norm_y = point_coords
+            pixel_x, pixel_y = self.coord_converter.denormalize_coordinates(norm_x, norm_y, image_path)
+            hid_x, hid_y = self.coord_converter.pixel_to_hid(pixel_x, pixel_y)
+
+            print(f"[Executor] Move Mouse: normalized ({norm_x}, {norm_y}) -> pixel ({pixel_x}, {pixel_y}) -> HID ({hid_x}, {hid_y})")
+
+            script_command = f'MouseMove {hid_x},{hid_y}'
+            self.image_server_client.send_script_command(script_command)
+            time.sleep(Config.MOUSE_MOVE_DELAY)
+
+            return (True, f"Mouse moved to HID ({hid_x}, {hid_y})")
+
+        except Exception as e:
+            return (False, f"Error: {str(e)}")
+
     def execute_input_at_point(
         self,
         image_path: str,
@@ -457,6 +488,36 @@ class CommandExecutor:
         except Exception as e:
             return (False, f"Failed to press key: {e}")
 
+    def scroll(
+        self,
+        direction: str,
+        delay: float = 0.1
+    ) -> Tuple[bool, str]:
+        """
+        执行鼠标滚轮滚动命令
+
+        Args:
+            direction: 滚动方向 ('up' 或 'down'，不区分大小写)
+            delay: 滚动后延迟
+
+        Returns:
+            (success, message)
+
+        Example:
+            success, msg = executor.scroll("down")
+            success, msg = executor.scroll("up")
+        """
+        try:
+            direction = direction.lower() if direction else "down"
+            if direction not in ("up", "down"):
+                direction = "down"
+
+            cmd = f'Scroll {direction}'
+            sequence = [{"command": cmd, "delay": delay}]
+            return self.execute_command_sequence(sequence)
+        except Exception as e:
+            return (False, f"Failed to scroll: {e}")
+
     def execute_mixed_operation(
         self,
         image_path: str,
@@ -549,6 +610,11 @@ class CommandExecutor:
                 path = op.get("path", "/tmp/screenshot.png")
                 delay = op.get("delay", 0.5)
                 builder.full_screen_capture(path, delay)
+
+            elif op_type == "scroll":
+                direction = op.get("direction", "down")
+                delay = op.get("delay", Config.SCROLL_DELAY)
+                builder.scroll(direction, delay)
 
             else:
                 print(f"Warning: Unknown operation type '{op_type}', skipping")
@@ -672,6 +738,21 @@ class CommandExecutor:
                 except ValueError:
                     duration = 1.0
                 operations.append({"type": "wait", "duration": duration})
+
+            elif action == "Scroll":
+                direction = op.get("key", "down")
+                operations.append({"type": "scroll", "direction": direction})
+
+            elif action == "Move Mouse":
+                point = op.get("point", "")
+                if point:
+                    try:
+                        px, py = point.split(",")
+                        operations.append({"type": "move_mouse", "norm_x": int(px), "norm_y": int(py)})
+                    except ValueError:
+                        print(f"Warning: Invalid point in Move Mouse step: {point}")
+                else:
+                    print("Warning: Skipping Move Mouse without point coordinates")
 
             else:
                 print(f"Warning: Unknown action type in sequence: {action}")
@@ -811,6 +892,14 @@ class CommandExecutor:
                 elif op_type == "screenshot":
                     path = op.get("path", "/tmp/screenshot.png")
                     cmd = f'FullScreenCapture "{path}"'
+                    self.image_server_client.send_script_command(cmd)
+                    results.append(cmd)
+
+                elif op_type == "scroll":
+                    direction = op.get("direction", "down").lower()
+                    if direction not in ("up", "down"):
+                        direction = "down"
+                    cmd = f'Scroll {direction}'
                     self.image_server_client.send_script_command(cmd)
                     results.append(cmd)
                 
@@ -1107,6 +1196,32 @@ class CommandBuilder:
             else:
                 self.delays.append(delay)
 
+        return self
+
+    def scroll(
+        self,
+        direction: str,
+        delay: float = 0.1
+    ) -> 'CommandBuilder':
+        """
+        添加鼠标滚轮滚动命令
+
+        Args:
+            direction: 滚动方向 ('up' 或 'down'，不区分大小写)
+            delay: 滚动后延迟
+
+        Returns:
+            self
+
+        Example:
+            builder.scroll("down").scroll("down").scroll("up")
+        """
+        direction = direction.lower() if direction else "down"
+        if direction not in ("up", "down"):
+            direction = "down"
+        cmd = f'Scroll {direction}'
+        self.commands.append(cmd)
+        self.delays.append(delay)
         return self
 
     def set_lock_state(

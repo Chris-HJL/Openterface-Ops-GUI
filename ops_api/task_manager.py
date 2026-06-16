@@ -671,6 +671,17 @@ class ReActTaskManager:
                         logger.info(f"[TaskManager] Input sent successfully (fallback mode)")
                         execution_success = True
                         execution_result = "Input sent successfully"
+                elif action == "Move Mouse" and point_coords:
+                    logger.info(f"[TaskManager] Moving mouse to point {point_coords}")
+                    executor = task.session.get_command_executor()
+                    success, result = executor.execute_move_mouse(image_path, point_coords)
+                    if success:
+                        logger.info(f"[TaskManager] Move Mouse action successful: {result}")
+                        execution_success = True
+                        execution_result = str(result)
+                    else:
+                        logger.error(f"[TaskManager] Move Mouse action failed: {result}")
+                        execution_error = str(result)
                 elif action == "Keyboard" and key_content:
                     logger.info(f"[TaskManager] Sending keyboard key: {key_content}")
                     from ops_core.utils.key_map import is_combo_key, get_tcp_key_code
@@ -694,6 +705,31 @@ class ReActTaskManager:
                             logger.info(f"[TaskManager] Keyboard screenshot captured: {screenshot_path}")
                     except Exception as e:
                         logger.error(f"[TaskManager] Keyboard screenshot capture failed: {str(e)}", exc_info=True)
+                elif action == "Scroll":
+                    direction = key_content if key_content else "down"
+                    direction = direction.lower()
+                    if direction not in ("up", "down"):
+                        direction = "down"
+                    logger.info(f"[TaskManager] Sending scroll command: direction={direction}")
+                    executor = task.session.get_command_executor()
+                    success, result = executor.scroll(direction)
+                    if success:
+                        logger.info(f"[TaskManager] Scroll action successful: {result}")
+                        execution_success = True
+                        execution_result = str(result)
+                    else:
+                        logger.error(f"[TaskManager] Scroll action failed: {result}")
+                        execution_error = str(result)
+
+                    # Capture screenshot after scroll operation
+                    try:
+                        screenshot_path = executor.capture_screenshot("scroll_after")
+                        if screenshot_path and os.path.exists(screenshot_path):
+                            current_image_base64 = image_to_base64(screenshot_path)
+                            task.iteration_images.append(current_image_base64)
+                            logger.info(f"[TaskManager] Scroll screenshot captured: {screenshot_path}")
+                    except Exception as e:
+                        logger.error(f"[TaskManager] Scroll screenshot capture failed: {str(e)}", exc_info=True)
                 elif action == "Type" and input_content:
                     # Handle Type action (new action type for text input)
                     logger.info(f"[TaskManager] Sending Type action: {input_content}")
