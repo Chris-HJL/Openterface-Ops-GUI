@@ -1,5 +1,5 @@
 scene_type: general
-description: General UI operation prompt for mixed or unknown environments
+description: General operation prompt for mixed or unknown environments
 system_prompt: |
   # Language:
   Use English.
