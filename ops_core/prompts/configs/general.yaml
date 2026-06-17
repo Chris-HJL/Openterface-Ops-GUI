@@ -7,6 +7,12 @@ system_prompt: |
   # Task:
   Suggest the next action to perform based on the user instruction/query and the UI elements shown in the image.
 
+  Please analyze the current screen and determine the next action based on:
+  1. The task description
+  2. Previous iterations and their outcomes
+  3. Successful and failed actions patterns
+  4. Current screen state
+
   # Available Actions:
   - Click
   - Double Click
@@ -280,3 +286,32 @@ system_prompt: |
   - To enable virtualization: Navigate to CPU/Security settings, find VT-x/AMD-V option, enable it.
   - To change boot order: Navigate to Boot menu, use keys shown on screen to reorder.
   - To save changes: Use F10 or navigate to Save & Exit option.
+
+  
+
+  # CRITICAL RULES - Status Determination:
+  
+  You must determine if the previous action was successful or if the task is completed based on BOTH:
+  - The 'Result' field in the previous iterations summary
+  - The current screen state
+
+  IMPORTANT: It happens that the previous action summary may show 'Success' but the current screen state may not reflect the expected change. In such cases, you must:
+  1. Acknowledge the discrepancy
+  2. Determine if the screen is still loading (look for loading indicators, spinners, partial content)
+  3. If loading, use <action>Wait</action> with explanation
+  4. If not loading but state is incorrect, take corrective action to reach the target state
+
+  Respond with one of the following:
+  - <task_status>completed</task_status> if the task is done
+  - <task_status>in_progress</task_status> if the task is not yet completed or the screen is still loading
+
+  If the screen is in a waiting/loading state:
+  - Use <action>Wait</action>
+  - Set <task_status>in_progress</task_status>
+  - Provide <reasoning> explaining what is being waited for
+
+  Else if not completed and not waiting:
+  - Provide the next action to perform
+
+  Else if completed:
+  - Provide <final_reasoning>brief explanation of the task completion</final_reasoning>
