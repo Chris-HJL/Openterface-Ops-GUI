@@ -1,377 +1,379 @@
 # Openterface-Ops-GUI
 
-## Overview
-
-Openterface-Ops-GUI is a web-based interface for interacting with AI models, specifically designed for UI inspection and automated interaction. It provides a seamless way to communicate with both language models and UI inspection models, enabling users to analyze and interact with UI elements through natural language commands. The application features a ReAct (Reasoning + Acting) agent mode for autonomous task execution with approval mechanisms for dangerous operations.
-
-## Architecture
-
-The application follows a modular architecture with clear separation of concerns:
-
-```
-Openterface-Ops-GUI/
-├── ops_api.py              # Application entry point
-├── config.py               # Global configuration management
-├── index.html              # Frontend web interface
-├── ui_model_server.py      # Standalone UI-Model server
-├── ops_api/                # Backend API module
-│   ├── app.py              # FastAPI application factory
-│   ├── endpoints.py        # API endpoints implementation
-│   ├── models.py           # Pydantic model definitions
-│   ├── session.py          # Session management
-│   ├── task_manager.py     # ReAct task manager
-│   ├── react_context.py    # ReAct context builder
-│   └── react_memory.py     # ReAct memory system
-├── ops_core/               # Core functionality modules
-│   ├── api/                # API client modules
-│   │   ├── client.py       # LLM API client
-│   │   └── connection.py   # API connection testing
-│   ├── i18n/               # Internationalization
-│   │   └── translator.py   # Language translator
-│   ├── image/              # Image processing
-│   │   ├── encoder.py      # Image encoding utilities
-│   │   └── drawer.py       # Image drawing utilities
-│   ├── image_server/       # Image server client
-│   │   └── client.py       # TCP image server client
-│   ├── rag/                # RAG functionality
-│   │   ├── index_builder.py
-│   │   ├── index_loader.py
-│   │   ├── readers.py      # Document readers
-│   │   └── retriever.py    # Document retriever
-│   └── ui_operations/      # UI operations
-│       ├── executor.py     # Command executor
-│       ├── parser.py       # Response parser
-│       ├── ui_ins_client.py # UI-Ins client
-│       └── checkbox_detector.py # Checkbox detection
-│   └── coord_converter.py  # Coordinate conversion (pixel ↔ HID)
-├── i18n/                   # Translation files
-│   ├── en.json             # English translations
-│   └── zh.json             # Chinese translations
-└── tools/                  # Utility tools
-```
+An AI-vision-based automated operation interface for Openterface KVM. It uses a single large language model for UI element recognition, positioning, and automated interaction, with a ReAct agent mode for complex multi-step tasks.
 
 ## Features
 
-- **Chat Interface**: Interactive chat with AI models
-- **Image Capture**: Get and display the latest screen image from TCP server
-- **UI Element Detection**: Identify and interact with UI elements using UI-Model
-- **Coordinate Conversion**: Automatic conversion between pixel and HID coordinates for accurate clicking
-- **ReAct Agent Mode**: Autonomous task execution with reasoning and acting cycles
-- **Approval System**: Manual, auto, or strict approval policies for dangerous operations
-- **Multi-turn Conversations**: Maintain conversation context across multiple messages
-- **Document Retrieval (RAG)**: Build and query document indexes
-- **Language Support**: Switch between English and Chinese
-- **Session Management**: Create and manage multiple sessions with different configurations
-- **Checkbox Detection**: Refined clicking on checkbox elements
-- **SSE Streaming**: Real-time progress updates via Server-Sent Events
+- **Single Model Architecture**: One VLM (Vision Language Model) handles UI understanding, element positioning, and action decisions — simplified deployment
+- **ReAct Agent**: Autonomous reasoning and execution loops for complex multi-step task automation
+- **Scene Adaptation**: 6 preset scenes (Auto-detect / General / BIOS / Windows / Linux / OS Installation), each with dedicated prompts
+- **Rich Keyboard/Mouse Operations**: Click, double-click, triple-click, right-click, mouse move, text input, combo keys (Ctrl+C/V/A, etc.), symbol keys, scroll, lock key toggle, full-screen screenshot
+- **Approval Mechanism**: Three-level approval policies (manual / auto / strict) with automatic dangerous operation detection
+- **Automatic Coordinate Conversion**: Screen resolution auto-detected from screenshots — zero configuration for any resolution
+- **Checkbox Precision**: OpenCV contour analysis auto-corrects click coordinates for checkbox elements
+- **RAG Document Retrieval**: LlamaIndex-based vector index, supports MHTML documents
+- **Multi-turn Conversations**: Context-aware multi-turn interaction mode
+- **SSE Real-time Progress**: Async tasks push progress and screenshots via Server-Sent Events
+- **Bilingual Support**: Frontend and backend both support English and Chinese
+- **Slash Commands**: Built-in shortcuts like `/image`, `/react`, `/scene`
 
-## Installation
+## Architecture
+
+```
+Openterface-Ops-GUI/
+├── ops_api.py              # Application entry point (uvicorn)
+├── config.py               # Global configuration
+├── index.html              # Frontend single-page application
+├── ui_model_server.py      # Optional: local VLM inference service
+├── ops_api/                # Backend API module
+│   ├── app.py              # FastAPI app factory
+│   ├── endpoints.py        # API endpoint implementations
+│   ├── models.py           # Pydantic model definitions
+│   ├── session.py          # Session management
+│   ├── task_manager.py     # ReAct async task manager
+│   ├── react_context.py    # ReAct context builder
+│   └── react_memory.py     # ReAct memory system
+├── ops_core/               # Core functionality modules
+│   ├── coord_converter.py  # Coordinate conversion (normalized ↔ pixel ↔ HID)
+│   ├── api/                # API client
+│   │   ├── client.py       # LLM API client (OpenAI compatible)
+│   │   └── connection.py   # API connection tester
+│   ├── i18n/               # Internationalization
+│   │   └── translator.py   # Language translator
+│   ├── image/              # Image processing
+│   │   ├── encoder.py      # Base64 image encoding/decoding
+│   │   └── drawer.py       # Image annotation drawing
+│   ├── image_server/       # Image server client
+│   │   └── client.py       # TCP image server client
+│   ├── prompts/            # Prompt system
+│   │   ├── types.py        # Scene type enum
+│   │   ├── loader.py       # YAML prompt loader
+│   │   ├── registry.py     # Prompt registry
+│   │   ├── detector.py     # VLM scene detector
+│   │   └── configs/        # Scene prompt configs
+│   │       ├── general.yaml
+│   │       ├── bios.yaml
+│   │       ├── windows.yaml
+│   │       ├── linux.yaml
+│   │       └── os_installation.yaml
+│   ├── rag/                # RAG functionality
+│   │   ├── index_builder.py
+│   │   ├── index_loader.py
+│   │   ├── readers.py      # MHTML document reader
+│   │   └── retriever.py    # Document retriever
+│   ├── ui_operations/      # UI operations
+│   │   ├── executor.py     # Command executor
+│   │   ├── parser.py       # LLM response parser
+│   │   └── checkbox_detector.py # Checkbox detector
+│   └── utils/              # Utility modules
+│       ├── key_map.py      # Key code mapping (with combo keys)
+│       ├── text_splitter.py # Text splitter
+│       └── command_sequence.py # Command sequence data structure
+├── i18n/                   # Translation files (en.json / zh.json)
+├── tests/                  # Test files
+└── tools/                  # Development tools
+```
+
+## Quick Start
 
 ### Prerequisites
 
-- Python 3.8 or higher
+- Python 3.8+
 - pip package manager
 
-### Setup
-
-1. Clone the repository:
+### Installation
 
 ```bash
 git clone <repository-url>
 cd Openterface-Ops-GUI
-```
-
-2. Install required dependencies:
-
-```bash
 pip install -r requirements.txt
 ```
 
-3. Set environment variables for API keys (depending on your model setup):
-
-**Windows:**
-```cmd
-set LLM_API_KEY=your_llm_api_key
-set UI_API_KEY=your_ui_api_key
-```
-
-**Linux/Mac:**
-```bash
-export LLM_API_KEY=your_llm_api_key
-export UI_API_KEY=your_ui_api_key
-```
-
-## Configuration
-
-### Model Configuration
-
-The application supports two types of models that can be configured through the web interface:
-
-1. **LLM (Large Language Model)**
-   - **API URL**: Endpoint for the main language model (default: `http://localhost:11434/v1/chat/completions`)
-   - **Model Name**: Name of the language model to use (default: `qwen3-vl:8b-thinking-q4_K_M`)
-
-2. **UI-Model (UI Inspection Model)**
-   - **API URL**: Endpoint for the UI inspection model (default: `http://localhost:2345/v1/chat/completions`)
-   - **Model Name**: Name of the UI inspection model to use (default: `fara-7b`)
-
-### API Key Configuration
-
-API keys for the models are set through environment variables:
-
-- `LLM_API_KEY`: API key for the main language model (default: "EMPTY")
-- `UI_API_KEY`: API key for the UI-Model (default: "EMPTY")
-
-### Additional Configuration
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `IMAGE_SERVER_HOST` | localhost | Image server hostname |
-| `IMAGE_SERVER_PORT` | 12345 | Image server port |
-| `RAG_DOCS_DIR` | ./docs | Documents directory for RAG |
-| `RAG_INDEX_DIR` | ./index | Index storage directory |
-| `MAX_REACT_ITERATIONS` | 20 | Maximum ReAct agent iterations |
-
-#### Coordinate Conversion
-
-The system **automatically detects screen resolution from screenshots** and converts pixel coordinates (from UI-Model) to HID coordinates (for Openterface KVM) to ensure accurate clicking.
-
-- ✅ **Zero Configuration**: Works with any resolution out of the box
-- ✅ **Automatic Detection**: Reads resolution directly from screen capture
-- ✅ **Fallback Configuration**: Can set SCREEN_WIDTH/SCREEN_HEIGHT if needed
-
-For detailed configuration options, see the Configuration section below.
-
-## Configuration
-
-### Screen Resolution (Optional)
-
-**✨ Zero Configuration (Recommended)**: The system automatically detects screen resolution from screenshots.
-
-Just start the application and it works seamlessly with any screen resolution!
-
-**Fallback Configuration** (only if automatic detection fails):
-
-You can configure the screen resolution through environment variables:
+### Environment Variables
 
 ```bash
-# Windows (PowerShell)
-$env:SCREEN_WIDTH="1920"
-$env:SCREEN_HEIGHT="1080"
+# Windows
+set LLM_API_KEY=your_api_key
 
-# Linux/Mac
-export SCREEN_WIDTH=1920
-export SCREEN_HEIGHT=1080
+# Linux / macOS
+export LLM_API_KEY=your_api_key
 ```
 
-**Default**: 1920×1080
-
-**Supported Resolutions**:
-
-| Resolution | Width | Height |
-|------------|-------|--------|
-| HD | 1280 | 720 |
-| FHD (Default) | 1920 | 1080 |
-| 2K | 2560 | 1440 |
-| 4K | 3840 | 2160 |
-
-The coordinate conversion feature automatically handles all resolutions.
-
-For detailed information, see [COORDINATE_CONVERSION.md](./COORDINATE_CONVERSION.md) and [QUICKSTART_COORDINATE.md](./QUICKSTART_COORDINATE.md)
-
-## Usage
-
-### Starting the Application
-
-1. Run the API server:
+### Start
 
 ```bash
 python ops_api.py
 ```
 
-2. The application will automatically open in your default web browser at `http://localhost:9000/static/index.html`
+The browser opens automatically at `http://localhost:9000/static/index.html`.
 
-3. If the browser doesn't open automatically, navigate to `http://localhost:9000/static/index.html` manually
+### Initialization
 
-### Starting the UI-Model Server (Optional)
+1. Configure the LLM's API URL and model name in the "Model Configuration" panel
+2. Click "Initialize Session" to create a session
+3. Type `/image` to capture the current screen
+4. Send a natural language command, e.g. "Click the Settings button"
 
-If you want to run the UI-Model locally:
+## Configuration
 
-```bash
-python ui_model_server.py --model-path <path-to-model> --port 2345
-```
+### Model Configuration
 
-### Initial Setup
+Configure via the frontend UI:
 
-1. On the web interface, configure the model settings in the "Model Configuration" section:
-   - Enter the API URLs and model names for your LLM and UI-Model
-   - Ensure API keys are set as environment variables if required
+| Setting | Default | Description |
+|---------|---------|-------------|
+| API URL | `http://localhost:11434/v1/chat/completions` | LLM API endpoint (OpenAI compatible) |
+| Model | `qwen3-vl:8b-thinking-q4_K_M` | Model name |
+| Max Iterations | `20` | Maximum ReAct iterations |
 
-2. Click "Initialize Session" to create a new session with your configuration
+### Environment Variables
 
-### Using the Interface
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `LLM_API_KEY` | `EMPTY` | LLM API key |
+| `SCREEN_WIDTH` | `1920` | Screen width (optional, auto-detect preferred) |
+| `SCREEN_HEIGHT` | `1080` | Screen height (optional, auto-detect preferred) |
+| `COORD_SYSTEM` | `hid` | Coordinate system (`hid` or `pixel`) |
+| `SCREEN_CAPTURE_TIMEOUT` | `120` | Screenshot timeout (seconds) |
 
-The interface consists of four main sections:
+### Scene Types
 
-1. **Model Configuration**: Set up your model endpoints and API keys
-2. **Image Display**: View the current screen image and processed results
-3. **ReAct Agent Progress**: Monitor agent execution progress and iterations
-4. **Chat Interface**: Send commands and view responses
+| Scene | Command | Description |
+|-------|---------|-------------|
+| `auto` | `/scene auto` | VLM auto-detects current UI type |
+| `general` | `/scene general` | General mixed scene |
+| `bios` | `/scene bios` | BIOS/UEFI interface |
+| `windows` | `/scene windows` | Windows desktop/applications |
+| `linux` | `/scene linux` | Linux desktop/terminal |
+| `os_installation` | `/scene os_installation` | OS installation interface |
 
-### Built-in Commands
+## Supported UI Actions
 
-The application supports the following built-in commands:
+| Action | Description |
+|--------|-------------|
+| `Click` | Left-click |
+| `Double Click` | Double-click |
+| `Right Click` | Right-click |
+| `Move Mouse` | Move cursor (no click) |
+| `Input` | Click + text input |
+| `Keyboard` | Key press / combo key (Ctrl+C, Alt+F4, Win+E, etc.) |
+| `Scroll` | Scroll wheel (up/down) |
+| `Type` | Pure text input |
+| `Press` | Single key press |
+| `Wait` | Wait for specified time |
+| `Sequence` | Multi-step operation sequence |
+| `Triple Click` | Triple-click (select whole paragraph) |
+| `Lock State` | Lock key toggle (CapsLock/NumLock/ScrollLock) |
+| `Screenshot` | Full-screen screenshot |
+
+### Combo Key Prefixes
+
+| Prefix | Modifier |
+|--------|----------|
+| `^` | Ctrl |
+| `+` | Shift |
+| `!` | Alt |
+| `#` | Win |
+
+Examples: `^c` = Ctrl+C, `+!a` = Shift+Alt+A
+
+## Built-in Commands
 
 | Command | Description |
 |---------|-------------|
-| `/quit`, `/exit`, `/q` | Exit the program (close browser window manually) |
-| `/clear`, `/cls` | Clear the chat history |
-| `/help` | Show help information with available commands |
-| `/info` | Display API status information for both models |
-| `/lang [en/zh]` | Switch between English and Chinese languages |
-| `/multiturn` | Enter multi-turn conversation mode (maintain context) |
-| `/single` | Exit multi-turn mode, return to single-turn mode |
-| `/load docs` | Load documents from the `./docs` directory and build an index |
-| `/unload docs` | Disable document index (RAG functionality) |
-| `/image` | Get and display the latest screen image |
-| `/react [task]` | Start ReAct agent mode with specified task |
-| `/stop-react` | Stop the currently running ReAct agent |
+| `/image` | Capture current screen |
+| `/react [task]` | Start ReAct agent |
+| `/stop-react` | Stop ReAct agent |
+| `/scene [type]` | Switch scene type |
+| `/lang [en\|zh]` | Switch language |
+| `/multiturn` | Enter multi-turn mode |
+| `/single` | Exit multi-turn mode |
+| `/load docs` | Build RAG document index |
+| `/unload docs` | Disable RAG |
+| `/clear` | Clear chat history |
+| `/info` | Show API status |
+| `/help` | Show help |
+| `/quit` | Exit program |
 
-### ReAct Agent Mode
+## ReAct Agent
 
-The ReAct (Reasoning + Acting) agent mode enables autonomous task execution:
+The ReAct (Reasoning + Acting) mode enables the LLM to autonomously execute multi-step tasks:
 
-1. **Starting**: Use `/react [task description]` to start the agent
-2. **Progress**: Monitor progress in the ReAct Agent Progress section
-3. **Stopping**: Use `/stop-react` or click "Stop Agent" button
+### Workflow
 
-**Approval Policies**:
-- `manual`: Each dangerous operation requires approval (default)
-- `auto`: All operations are automatically approved
-- `strict`: All operations require approval
+```
+User task → Capture screen → LLM reasoning → Parse action → Approval check → Execute → Result screenshot → Next iteration...
+```
 
-**Dangerous Actions** (require approval in manual mode):
-- Delete, Format, Uninstall, Remove
-- Erase, Wipe, Clear, Reset, Destroy
-- And their Chinese equivalents
+Each iteration:
+1. Capture latest screen screenshot
+2. Build enhanced prompt (with iteration history and memory)
+3. Call LLM for reasoning and action decision
+4. Parse `<action>`, `<element>`, `<point>`, `<reasoning>` tags from response
+5. Dangerous operation detection and approval wait
+6. Execute UI action
+7. Capture post-action screenshot
+8. Push SSE progress event
 
-### Workflow Example
+### Approval Policies
 
-1. Start the application and initialize a session
-2. Enter `/image` to capture the current screen
-3. Send a command like "Click on the Settings button" to interact with UI elements
-4. View the processed image with the detected UI element highlighted
-5. For complex tasks, use `/react Open Settings and enable dark mode` for autonomous execution
+| Policy | Description |
+|--------|-------------|
+| `manual` | Only dangerous operations require approval (default) |
+| `auto` | All operations auto-approved |
+| `strict` | All operations require approval |
+
+### Dangerous Operation Keywords
+
+Delete, Format, Uninstall, Remove, Erase, Wipe, Clear, Reset, Destroy, and their Chinese equivalents.
+
+## Coordinate Conversion System
+
+Three-level coordinate conversion chain:
+
+```
+LLM normalized (0-1000) → Pixel coordinates → +Offset compensation → HID (0-4096) → TCP command
+```
+
+- **Zero Configuration**: Auto-detects resolution from screenshots
+- **Y-axis Offset Compensation**: Default -10 pixels, configurable in UI
+- **Boundary Clamping**: Auto-clamped to 0-4096 range
 
 ## API Endpoints
-
-The backend provides the following API endpoints:
 
 ### Session Management
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/create-session` | POST | Create a new session with configuration |
-| `/status/{session_id}` | GET | Get API status information |
+| `/create-session` | POST | Create new session |
+| `/status/{session_id}` | GET | Get API status |
 | `/clear-history` | POST | Clear conversation history |
-| `/switch-lang` | POST | Switch language for the session |
-| `/toggle-multiturn` | POST | Toggle multiturn conversation mode |
+| `/switch-lang` | POST | Switch language |
+| `/switch-scene` | POST | Switch scene type |
+| `/toggle-rag` | POST | Toggle RAG |
+| `/toggle-multiturn` | POST | Toggle multi-turn mode |
+| `/session/{session_id}` | DELETE | Delete session |
 
-### Chat and Image
+### Chat & Image
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/chat` | POST | Handle chat requests with optional image |
-| `/get-image` | POST | Get the latest image from the server |
+| `/chat` | POST | Handle chat request |
+| `/get-image` | POST | Get latest screenshot |
 
 ### RAG
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/build-index` | POST | Build RAG index from documents |
-| `/toggle-rag` | POST | Toggle RAG functionality |
+| `/build-index` | POST | Build RAG index |
 
-### ReAct Agent
+### ReAct Async Tasks
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/react-task` | POST | Create and start async ReAct task |
 | `/react-stream/{task_id}` | GET | SSE stream for task progress |
 | `/react-status/{task_id}` | GET | Get task status |
-| `/stop-react-task` | POST | Stop running ReAct task |
+| `/stop-react-task` | POST | Stop task |
 | `/approve-action/{task_id}` | POST | Approve pending action |
 | `/reject-action/{task_id}` | POST | Reject pending action |
 | `/set-approval-policy/{task_id}` | POST | Set approval policy |
+| `/approval-history/{task_id}` | GET | Get approval history |
+| `/task/{task_id}` | DELETE | Delete task |
 
-## Response Format
+### ReAct Sync Mode
 
-The LLM should respond with structured tags for UI operations:
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/react` | POST | Execute ReAct synchronously (blocking) |
+| `/stop-react` | POST | Stop sync ReAct |
+
+## LLM Response Format
+
+The LLM should return XML-tagged responses:
 
 ```xml
 <action>Click</action>
 <element>Settings button</element>
 <reasoning>The user wants to access settings...</reasoning>
+<point>500, 300</point>
 <task_status>in_progress</task_status>
 ```
 
-Supported actions:
-- `Click`, `Double Click`, `Right Click` - Mouse operations
-- `Input` - Text input (with `<input>text</input>`)
-- `Keyboard` - Keyboard shortcuts (with `<key>Ctrl+C</key>`)
+Optional tags:
+- `<input>text</input>` — Input content for Input action
+- `<key>Ctrl+C</key>` — Key for Keyboard action
+- `<final_reasoning>...</final_reasoning>` — Final reasoning on task completion
+- `<steps><step>...</step></steps>` — Steps for Sequence action
 
-## Session Management
+## Advanced Features
 
-Each session maintains its own configuration, conversation history, and state. Sessions are identified by unique session IDs generated when a new session is created. You can create multiple sessions with different configurations for different use cases.
+### CommandBuilder Chaining API
 
-## Language Support
+```python
+CommandBuilder(executor)
+    .click(960, 540)
+    .type_text("admin")
+    .press_key("Tab")
+    .type_text("password123")
+    .click(800, 500)
+    .build()
+```
 
-The application supports both English and Chinese languages. You can switch between languages using the `/lang` command or through the API. Translation files are located in the `i18n/` directory.
+### Text Splitting Strategies
 
-## RAG (Retrieval-Augmented Generation)
+Long text is auto-split into multiple Send commands. 4 strategies: `simple`, `words`, `punctuation`, `sentences`.
 
-The application supports RAG functionality, allowing you to build an index from documents in the `./docs` directory and use them to augment AI responses. Use the `/load docs` command to build the index and `/unload docs` to disable RAG functionality.
+### Checkbox Precision Detection
 
-## UI Inspection Workflow
+When the LLM identifies a checkbox, OpenCV contour analysis searches for square contours near the returned coordinates and auto-corrects the click position.
 
-1. Capture the current screen image
-2. Send a command to identify or interact with UI elements
-3. The UI-Model processes the image and identifies the requested UI element
-4. A rectangle is drawn around the detected element on the processed image
-5. The processed image is displayed in the "Proposed Action" panel
-6. For checkbox elements, coordinates are automatically refined
+### ReAct Memory System
+
+Records successful and failed operation patterns, injected into subsequent iteration prompts to help the LLM avoid repeating mistakes.
+
+## Testing
+
+```bash
+# Run tests
+python -m pytest tests/
+
+# Standalone test scripts
+python test_combo_key.py    # Combo key test
+python test_double_click.py  # Double-click test
+python test_scroll.py        # Scroll test
+```
+
+## Development Tools
+
+- `tools/tcpserver_simulator.py` — TCP server simulator (for development)
+- `tools/tcp_test_client.py` — TCP test client
+- `tools/create_test_image.py` — Create test images
 
 ## Troubleshooting
 
-### Common Issues
+### API Connection Failed
+- Verify the API URL is correct and the model server is running
+- Check `LLM_API_KEY` environment variable
 
-1. **API Connection Errors**:
-   - Check that the API URLs are correct
-   - Ensure the model servers are running
-   - Verify API keys are set correctly
+### Screenshot Capture Failed
+- Ensure Openterface KVM device is connected
+- Check `IMAGE_SERVER_HOST` and `IMAGE_SERVER_PORT` (default port: `12345`)
 
-2. **Image Capture Issues**:
-   - Ensure the image server is running on the configured host:port
-   - Check permissions for accessing screen capture
+### Inaccurate Click Position
+- Resolution is auto-detected from screenshots — usually no manual config needed
+- If offset persists, configure X/Y pixel offset in the frontend
+- Check `COORD_Y_OFFSET` setting (default: -10)
 
-3. **UI Element Detection Issues**:
-   - Ensure the UI-Model is properly configured
-   - Try using more specific commands to identify UI elements
+### ReAct Agent Stuck
+- Check max iterations setting
+- Review reasoning output for debugging
+- Use `manual` approval mode for safer execution
+- Use `/stop-react` to stop
 
-4. **ReAct Agent Issues**:
-   - Check the maximum iterations setting
-   - Review the reasoning output for debugging
-   - Use manual approval mode for safer execution
+## Logging
 
-### Logging
-
-The application logs information to `ops_api.log` and console output, which can be helpful for debugging issues. Check the logs for error messages and status updates.
-
-## Security Considerations
-
-- API keys are handled through environment variables, not hardcoded in the application
-- CORS is enabled for development purposes, but should be restricted in production
-- Sessions are stored in memory and are not persisted across server restarts
-- Dangerous operations require explicit approval in manual mode
+Logs are written to `ops_api.log` and console output.
 
 ## License
 
@@ -379,10 +381,4 @@ MIT License. See the LICENSE file for details.
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit issues and pull requests.
-
-## Acknowledgments
-
-- Built with FastAPI and modern web technologies
-- Supports various AI models through OpenAI-compatible API interfaces
-- Designed for ease of use and extensibility
+Contributions are welcome! Please submit issues and pull requests.
