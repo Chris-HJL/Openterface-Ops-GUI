@@ -122,8 +122,8 @@ Configure via the frontend UI:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| API URL | `http://localhost:11434/v1/chat/completions` | LLM API endpoint (OpenAI compatible) |
-| Model | `qwen3-vl:8b-thinking-q4_K_M` | Model name |
+| API URL | `http://localhost:8000/v1/chat/completions` | LLM API endpoint (OpenAI compatible) |
+| Model | `qwen3.6-27b` | Model name |
 | Max Iterations | `20` | Maximum ReAct iterations |
 
 ### Environment Variables
