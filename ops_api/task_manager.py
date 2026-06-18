@@ -420,6 +420,7 @@ class ReActTaskManager:
                 # 错误检查
                 if not image_path or image_path.startswith("Error:") or not image_path.startswith("./images"):
                     logger.error(f"[TaskManager] Failed to get image: {image_path}")
+                    task.session.react_memory_store.finalize_memory(task.session_id, "error")
                     task.error(f"Failed to get image from server: {image_path}")
                     return
 
@@ -483,6 +484,32 @@ class ReActTaskManager:
                 )]
                 task_status = task_status_matches[0] if task_status_matches else "in_progress"
 
+                # Extract task plan (only on first iteration or if no plan exists yet)
+                plan_data = None
+                if iteration_num == 1 or not task.session.react_memory.task_plan:
+                    plan_data = parser.parse_plan(response)
+                    if plan_data:
+                        from ops_api.react_memory import TaskPlan, SubTask
+                        plan = TaskPlan(
+                            overview=plan_data["overview"],
+                            subtasks=[
+                                SubTask(id=str(st["id"]), description=st["description"])
+                                for st in plan_data["subtasks"]
+                            ]
+                        )
+                        task.session.react_memory_store.set_task_plan(task.session_id, plan)
+                        logger.info(f"[TaskManager] Task plan created: {plan.overview}, {len(plan.subtasks)} subtasks")
+
+                # Extract subtask status update
+                status_update = parser.parse_subtask_status_update(response)
+                if status_update:
+                    updated = task.session.react_memory_store.update_subtask_status(
+                        task.session_id, status_update["id"], status_update["status"],
+                        notes=status_update.get("notes", ""), iteration=iteration_num
+                    )
+                    if updated:
+                        logger.info(f"[TaskManager] Subtask {status_update['id']} status updated to {status_update['status']}, notes: {status_update.get('notes', '')}")
+
                 # Record iteration
                 iteration_record = IterationRecord(
                     iteration_number=iteration_num,
@@ -502,6 +529,7 @@ class ReActTaskManager:
                 # Check if need to stop
                 if task.should_stop:
                     logger.info(f"[TaskManager] Task stop requested before executing action")
+                    task.session.react_memory_store.finalize_memory(task.session_id, "stopped")
                     task.stop()
                     return
 
@@ -515,6 +543,14 @@ class ReActTaskManager:
                         final_reasoning_pattern, response, re.DOTALL
                     )]
                     final_reasoning = final_reasoning_matches[0] if final_reasoning_matches else None
+
+                    # Auto-complete any remaining subtasks
+                    plan = task.session.react_memory.task_plan
+                    if plan:
+                        for st in plan.subtasks:
+                            if st.status != "completed":
+                                plan.update_subtask_status(st.id, "completed", iteration=iteration_num)
+                        logger.info(f"[TaskManager] Task plan finalized: {plan.completed_count}/{plan.total_count} subtasks completed")
 
                     # Update iteration record
                     iteration_record.execution_success = True
@@ -572,10 +608,12 @@ class ReActTaskManager:
 
                     if approval_result == "rejected":
                         logger.info(f"[TaskManager] Action rejected, stopping task")
+                        task.session.react_memory_store.finalize_memory(task.session_id, "rejected")
                         task.error(f"Action rejected by user: {task.approval_history[-1].get('reason', 'No reason')}")
                         return
                     elif approval_result == "timeout":
                         logger.info(f"[TaskManager] Approval timeout, stopping task")
+                        task.session.react_memory_store.finalize_memory(task.session_id, "timeout")
                         task.error("Approval timeout")
                         return
                     elif approval_result == "approved":
@@ -798,6 +836,29 @@ class ReActTaskManager:
                 task.session.react_memory_store.update_patterns(task.session_id, iteration_record)
 
                 # Update progress: display operation result
+                # Serialize task plan for frontend
+                plan_for_frontend = None
+                if task.session.react_memory.task_plan:
+                    plan = task.session.react_memory.task_plan
+                    plan_for_frontend = {
+                        "overview": plan.overview,
+                        "subtasks": [
+                            {"id": st.id, "description": st.description, "status": st.status, "notes": st.notes}
+                            for st in plan.subtasks
+                        ],
+                        "completed_count": plan.completed_count,
+                        "total_count": plan.total_count
+                    }
+
+                # Serialize subtask status update for frontend
+                subtask_update_for_frontend = None
+                if status_update:
+                    subtask_update_for_frontend = {
+                        "id": status_update["id"],
+                        "status": status_update["status"],
+                        "notes": status_update.get("notes", "")
+                    }
+
                 task.update_progress(
                     iteration=iteration_num,
                     action=action,
@@ -805,12 +866,15 @@ class ReActTaskManager:
                     key_content=key_content,
                     reasoning=reasoning,
                     task_status=task_status,
-                    image=current_image_base64
+                    image=current_image_base64,
+                    task_plan=plan_for_frontend,
+                    subtask_status_update=subtask_update_for_frontend
                 )
 
                 # Check if need to stop
                 if task.should_stop:
                     logger.info(f"[TaskManager] Task stop requested before waiting")
+                    task.session.react_memory_store.finalize_memory(task.session_id, "stopped")
                     task.stop()
                     return
 
@@ -822,6 +886,7 @@ class ReActTaskManager:
                 for _ in range(wait_seconds):
                     if task.should_stop:
                         logger.info(f"[TaskManager] Task stop requested during wait")
+                        task.session.react_memory_store.finalize_memory(task.session_id, "stopped")
                         task.stop()
                         return
                     await asyncio.sleep(1)

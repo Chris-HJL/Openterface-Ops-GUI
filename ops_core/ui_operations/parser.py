@@ -8,6 +8,64 @@ class ResponseParser:
     """Response parser class"""
 
     @staticmethod
+    def parse_plan(text: str) -> Optional[Dict]:
+        """
+        Parse task plan from LLM response.
+
+        Expected format:
+        <plan>
+        <overview>High level summary</overview>
+        <subtask id="1">Description</subtask>
+        <subtask id="2">Description</subtask>
+        ...
+        </plan>
+
+        Returns:
+            Dict with 'overview' and 'subtasks' list, or None if no plan found.
+        """
+        plan_pattern = r'<plan>(.*?)</plan>'
+        plan_match = re.search(plan_pattern, text, re.DOTALL)
+        if not plan_match:
+            return None
+
+        plan_content = plan_match.group(1)
+
+        # Extract overview
+        overview_pattern = r'<overview>(.*?)</overview>'
+        overview_match = re.search(overview_pattern, plan_content, re.DOTALL)
+        overview = overview_match.group(1).strip() if overview_match else ""
+
+        # Extract subtasks
+        subtask_pattern = r'<subtask\s+id="(\d+)">(.*?)</subtask>'
+        subtask_matches = re.findall(subtask_pattern, plan_content, re.DOTALL)
+        subtasks = [
+            {"id": sid, "description": desc.strip()}
+            for sid, desc in subtask_matches
+        ]
+
+        if not subtasks:
+            return None
+
+        return {"overview": overview, "subtasks": subtasks}
+
+    @staticmethod
+    def parse_subtask_status_update(text: str) -> Optional[Dict]:
+        """
+        Parse subtask status update from LLM response.
+
+        Expected format:
+        <subtask_status id="1" status="completed">optional reason</subtask_status>
+
+        Returns:
+            Dict with 'id', 'status', and 'notes', or None if not found.
+        """
+        pattern = r'<subtask_status\s+id="(\d+)"\s+status="(\w+)">(.*?)</subtask_status>'
+        match = re.search(pattern, text, re.DOTALL)
+        if not match:
+            return None
+        return {"id": match.group(1), "status": match.group(2), "notes": match.group(3).strip()}
+
+    @staticmethod
     def extract_action_and_element(text: str) -> Tuple[Optional[str], Optional[str], Optional[str], Optional[str], Optional[Tuple[int, int]]]:
         """
         Extract action and element from response

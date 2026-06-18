@@ -451,13 +451,29 @@ async def react_stream(task_id: str):
                 # Check task status
                 if task.status == "completed":
                     logger.info(f"[ReAct Stream] Task completed, sending completed event")
+
+                    # Include final task plan if available
+                    task_plan_data = None
+                    if task.session and task.session.react_memory and task.session.react_memory.task_plan:
+                        plan = task.session.react_memory.task_plan
+                        task_plan_data = {
+                            "overview": plan.overview,
+                            "subtasks": [
+                                {"id": st.id, "description": st.description, "status": st.status, "notes": st.notes}
+                                for st in plan.subtasks
+                            ],
+                            "completed_count": plan.completed_count,
+                            "total_count": plan.total_count
+                        }
+
                     data = {
                         "event": "completed",
                         "data": {
                             "iterations_completed": task.current_iteration,
                             "final_status": task.final_status,
                             "message": task.message,
-                            "images": task.iteration_images
+                            "images": task.iteration_images,
+                            "task_plan": task_plan_data
                         }
                     }
                     yield f"data: {json.dumps(data)}\n\n"
@@ -503,7 +519,9 @@ async def react_stream(task_id: str):
                                 "reasoning": progress_data.get("reasoning"),
                                 "task_status": progress_data.get("task_status"),
                                 "image_path": progress_data.get("image_path"),
-                                "image": progress_data.get("image")
+                                "image": progress_data.get("image"),
+                                "task_plan": progress_data.get("task_plan"),
+                                "subtask_status_update": progress_data.get("subtask_status_update")
                             }
                         }
                         yield f"data: {json.dumps(data)}\n\n"

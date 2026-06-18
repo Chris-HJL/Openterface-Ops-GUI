@@ -74,7 +74,7 @@
         }
         
         .chat-messages {
-            height: 300px;
+            height: 600px;
             overflow-y: auto;
             border: 1px solid #ddd;
             border-radius: 4px;
@@ -456,6 +456,87 @@
             display: block;
             margin-bottom: 5px;
         }
+
+        .task-plan {
+            background-color: #f3e8ff;
+            border-left: 4px solid #7c3aed;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .task-plan strong {
+            color: #6d28d9;
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .task-plan-overview {
+            color: #5b21b6;
+            margin-bottom: 8px;
+            font-style: italic;
+        }
+
+        .task-plan-subtask {
+            padding: 4px 0 4px 20px;
+            position: relative;
+            color: #4a5568;
+        }
+
+        .task-plan-subtask::before {
+            position: absolute;
+            left: 0;
+        }
+
+        .task-plan-subtask.pending::before { content: '⬜'; }
+        .task-plan-subtask.in_progress::before { content: '🔵'; }
+        .task-plan-subtask.completed::before { content: '✅'; }
+        .task-plan-subtask.skipped::before { content: '⬛'; }
+
+        .task-plan-subtask .subtask-notes {
+            display: block;
+            margin-left: 20px;
+            color: #718096;
+            font-size: 12px;
+            font-style: italic;
+        }
+
+        .task-plan-progress-bar {
+            height: 6px;
+            background-color: #e9d5ff;
+            border-radius: 3px;
+            margin: 8px 0;
+            overflow: hidden;
+        }
+
+        .task-plan-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #7c3aed, #a855f7);
+            border-radius: 3px;
+            transition: width 0.3s ease;
+        }
+
+        .subtask-status-update {
+            background-color: #ecfdf5;
+            border-left: 4px solid #10b981;
+            padding: 10px 12px;
+            margin: 8px 0;
+            border-radius: 4px;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .subtask-status-update strong {
+            color: #059669;
+        }
+
+        .subtask-status-update .update-notes {
+            color: #4a5568;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
@@ -642,6 +723,12 @@ export LLM_API_KEY=your_llm_api_key</pre>
                     // Clear previous messages except welcome message
                     const chatMessages = document.getElementById('chat-messages');
                     chatMessages.innerHTML = '<div class="message assistant">Welcome to Openterface Ops API! Please enter your query.</div>';
+                    // Add task plan container (hidden by default)
+                    const taskPlanContainer = document.createElement("div");
+                    taskPlanContainer.id = "task-plan-container";
+                    taskPlanContainer.className = "task-plan message assistant";
+                    taskPlanContainer.style.display = "none";
+                    chatMessages.appendChild(taskPlanContainer);
                     
                     // Display available commands
                     const helpMessage = `Available commands:<br>
@@ -1125,6 +1212,9 @@ Main API Status: ${data.api_status}`;
                             if (data.event === 'progress') {
                                 console.log('Entering progress branch');
                                 const progressData = data.data;
+                                console.log("Progress data keys:", Object.keys(progressData));
+                                console.log("Task plan in progress data:", progressData.task_plan);
+                                console.log("Subtask update in progress data:", progressData.subtask_status_update);
                                 
                                 // Update progress bar
                                 const progressPercent = (progressData.iteration / progressData.max_iterations) * 100;
@@ -1156,6 +1246,29 @@ Main API Status: ${data.api_status}`;
                                     </div>
                                 `;
                                 addMessage(progressMessage, 'assistant');
+
+                                // Update task plan container if present
+                                if (progressData.task_plan) {
+                                    const plan = progressData.task_plan;
+                                    const taskPlanContainer = document.getElementById('task-plan-container');
+                                    const progressPercent = plan.total_count > 0 ? (plan.completed_count / plan.total_count * 100) : 0;
+                                    const subtasksHtml = plan.subtasks.map(st => {
+                                        return `<div class="task-plan-subtask ${st.status}">
+                                                    ${st.id}. ${st.description}
+                                                    ${st.notes ? `<span class="subtask-notes">${st.notes}</span>` : ''}
+                                                </div>`;
+                                    }).join('');
+                                    const planHtml = `<strong>📋 Task Plan</strong>
+                                        <div class="task-plan-overview">${plan.overview}</div>
+                                        <div class="task-plan-progress-bar">
+                                            <div class="task-plan-progress-fill" style="width: ${progressPercent}%"></div>
+                                        </div>
+                                        <div style="font-size:12px;color:#6d28d9;margin-bottom:6px;">Progress: ${plan.completed_count}/${plan.total_count} completed</div>
+                                        ${subtasksHtml}
+                                    `;
+                                    taskPlanContainer.innerHTML = planHtml;
+                                    taskPlanContainer.style.display = 'block';
+                                }
 
                                 // Display operation image in real-time if available
                                 if (progressData.image) {
@@ -1213,6 +1326,29 @@ Main API Status: ${data.api_status}`;
                                 }
                                 
                                 addMessage(completionMessage, 'assistant');
+
+                                // Update task plan with final state if available
+                                if (completedData.task_plan) {
+                                    const plan = completedData.task_plan;
+                                    const taskPlanContainer = document.getElementById('task-plan-container');
+                                    const progressPercent = plan.total_count > 0 ? (plan.completed_count / plan.total_count * 100) : 0;
+                                    const subtasksHtml = plan.subtasks.map(st => {
+                                        return `<div class="task-plan-subtask ${st.status}">
+                                                    ${st.id}. ${st.description}
+                                                    ${st.notes ? `<span class="subtask-notes">${st.notes}</span>` : ''}
+                                                </div>`;
+                                    }).join('');
+                                    const planHtml = `<strong>📋 Task Plan</strong>
+                                        <div class="task-plan-overview">${plan.overview}</div>
+                                        <div class="task-plan-progress-bar">
+                                            <div class="task-plan-progress-fill" style="width: ${progressPercent}%"></div>
+                                        </div>
+                                        <div style="font-size:12px;color:#6d28d9;margin-bottom:6px;">Progress: ${plan.completed_count}/${plan.total_count} completed</div>
+                                        ${subtasksHtml}
+                                    `;
+                                    taskPlanContainer.innerHTML = planHtml;
+                                    taskPlanContainer.style.display = 'block';
+                                }
 
                                 document.getElementById('progress-fill').style.width = '100%';
                                 document.getElementById('progress-text').textContent = progressText;
@@ -1473,10 +1609,12 @@ Main API Status: ${data.api_status}`;
             chatMessages.appendChild(messageDiv);
             console.log('Message added to DOM');
             
-            // Force scroll to bottom
+            // Scroll to bottom only if user is already near the bottom (within 100px)
             setTimeout(() => {
-                chatMessages.scrollTop = chatMessages.scrollHeight;
-                console.log('Forced scroll to bottom, scrollHeight:', chatMessages.scrollHeight);
+                const nearBottom = chatMessages.scrollHeight - chatMessages.scrollTop - chatMessages.clientHeight < 100;
+                if (nearBottom) {
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                }
             }, 0);
             
             // Return the created message element
