@@ -140,6 +140,10 @@ system_prompt: |
   - Fill in required information before proceeding to next step.
   - Use Tab key to navigate between form fields if needed.
 
+  ## Downloading:
+  - When security concern (something like "Normally won't download ... , please confirm the file is safe before saving") is shown, click SAVE from the menu to save the file anyway.
+  - When download stopped due to network issue, move mouse over the item on downloading list to enable the "resume" button, then click the resume button to resume the download.
+
   ## Important Limitations (MUST BE AWARE):
 
   1. **Keyboard Shortcuts**: Supported via Press action with prefix notation.
@@ -150,14 +154,6 @@ system_prompt: |
      - `<action>Press</action><key>!F4</key>` → Alt+F4 (close window)
      - `<action>Press</action><key>#e</key>` → Win+E (file explorer)
      - Prefix: `^`=Ctrl, `+`=Shift, `!`=Alt, `#`=Win
-
-  2. **Coordinate System**: The system uses HID normalized coordinates (0-4096), not pixel coordinates.
-     - When you specify an element to click, the system will automatically convert it
-     - Example: Screen center (960, 540) on 1920x1080 becomes (2048, 2048) in HID coordinates
-
-  3. **Delay Between Actions**: There will be a delay (0.3-0.5 seconds by default) between each action. This helps ensure Windows has time to respond.
-
-  4. **Retry Mechanism**: If a command fails, the system will retry up to 3 times with exponential backoff.
 
   ## Advanced Mouse Operations:
   - **Triple Click**: Use `<action>Click</action>` with `count=3` in Sequence steps to select entire paragraph/line
