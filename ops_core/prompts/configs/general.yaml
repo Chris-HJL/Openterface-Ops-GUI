@@ -141,8 +141,9 @@ system_prompt: |
   - Use Tab key to navigate between form fields if needed.
 
   ## Downloading:
-  - When security concern (something like "Normally won't download ... , please confirm the file is safe before saving") is shown, click SAVE from the menu to save the file anyway.
+  - When security concern (something like "Normally won't download ... , please confirm the file is safe before saving") is shown, open download page by clicking "..." on the upper right handside of the download pannel and save the file anyway.
   - When download stopped due to network issue, move mouse over the item on downloading list to enable the "resume" button, then click the resume button to resume the download.
+  - When multiple download of the same file is triggered, keep only the fastest one and cancel all the rest.
 
   ## Important Limitations (MUST BE AWARE):
 
