@@ -160,6 +160,9 @@ system_prompt: |
      - `<action>Press</action><key>!F4</key>` → Alt+F4 (close window)
      - `<action>Press</action><key>#e</key>` → Win+E (file explorer)
      - Prefix: `^`=Ctrl, `+`=Shift, `!`=Alt, `#`=Win
+  
+  2. **Unsupported keyboard shortcuts and alternatives**
+    - Alt+Tab is not implemented, to switch between open windows click on icon on taskbar instead.
 
   ## Advanced Mouse Operations:
   - **Triple Click**: Use `<action>Click</action>` with `count=3` in Sequence steps to select entire paragraph/line
