@@ -44,6 +44,15 @@ system_prompt: |
 
   Valid statuses: pending, in_progress, completed, skipped
 
+  **Dynamic plan modification (any iteration after plan creation):**
+  During execution, you can modify your plan dynamically when you discover new steps or need to adjust:
+  - **Add a new sub-task:** `<plan_update operation="add" description="New subtask description" insert_after_id="2"></plan_update>`
+    (omit insert_after_id to append at the end)
+  - **Remove a sub-task:** `<plan_update operation="remove" subtask_id="3"></plan_update>`
+  - **Modify a sub-task description:** `<plan_update operation="modify" subtask_id="1" description="Updated description"></plan_update>`
+  - **Update the overall overview:** `<plan_update operation="update_overview" overview="Updated approach summary"></plan_update>`
+  Use these when the screen reveals unexpected steps, when a step needs splitting, or when a step is no longer needed.
+
   The system will track your plan and include it in subsequent iterations so you can see progress. Reference the plan and previous sub-task notes when deciding your next action.
 
   # Output Format:

@@ -51,6 +51,36 @@ class TaskPlan:
                 return old != status
         return False
 
+    def add_subtask(self, description: str, iteration: Optional[int] = None) -> SubTask:
+        """Add a new subtask with auto-incremented id. Returns the new SubTask."""
+        new_id = str(max((int(st.id) for st in self.subtasks), default=0) + 1)
+        st = SubTask(
+            id=new_id,
+            description=description,
+            completed_iteration=iteration
+        )
+        self.subtasks.append(st)
+        return st
+
+    def remove_subtask(self, subtask_id: str) -> bool:
+        """Remove a subtask by id. Returns True if found and removed."""
+        for i, st in enumerate(self.subtasks):
+            if st.id == subtask_id:
+                self.subtasks.pop(i)
+                return True
+        return False
+
+    def modify_subtask(self, subtask_id: str, description: Optional[str] = None, notes: Optional[str] = None) -> bool:
+        """Modify a subtask's description or notes. Returns True if found and modified."""
+        for st in self.subtasks:
+            if st.id == subtask_id:
+                if description is not None:
+                    st.description = description
+                if notes is not None:
+                    st.notes = notes
+                return True
+        return False
+
 
 @dataclass
 class IterationRecord:
@@ -158,4 +188,48 @@ class ReActMemoryStore:
         memory = self.memories.get(session_id)
         if memory and memory.task_plan:
             return memory.task_plan.update_subtask_status(subtask_id, status, notes=notes, iteration=iteration)
+        return False
+
+    def apply_plan_update(self, session_id: str, update: Dict) -> bool:
+        """
+        Apply a dynamic plan update (add/remove/modify subtask, or update overview).
+        update: Dict with 'operation' key and additional fields:
+        - operation="add", description="...", insert_after_id="N" (optional)
+        - operation="remove", subtask_id="N"
+        - operation="modify", subtask_id="N", description="...", notes="..."
+        - operation="update_overview", overview="..."
+        Returns True if applied successfully.
+        """
+        memory = self.memories.get(session_id)
+        if not memory or not memory.task_plan:
+            return False
+        plan = memory.task_plan
+        op = update.get("operation")
+        if op == "add":
+            description = update.get("description", "").strip()
+            if not description:
+                return False
+            insert_after = update.get("insert_after_id")
+            new_st = plan.add_subtask(description)
+            # Move to correct position if insert_after_id specified
+            if insert_after:
+                for i, st in enumerate(plan.subtasks):
+                    if st.id == insert_after:
+                        # Move new subtask (last) to position after insert_after
+                        plan.subtasks.pop()
+                        plan.subtasks.insert(i + 1, new_st)
+                        break
+            return True
+        elif op == "remove":
+            return plan.remove_subtask(update.get("subtask_id", ""))
+        elif op == "modify":
+            sid = update.get("subtask_id", "")
+            desc = update.get("description")
+            notes = update.get("notes")
+            return plan.modify_subtask(sid, description=desc, notes=notes)
+        elif op == "update_overview":
+            overview = update.get("overview", "").strip()
+            if overview:
+                plan.overview = overview
+                return True
         return False

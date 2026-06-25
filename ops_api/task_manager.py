@@ -510,6 +510,21 @@ class ReActTaskManager:
                     if updated:
                         logger.info(f"[TaskManager] Subtask {status_update['id']} status updated to {status_update['status']}, notes: {status_update.get('notes', '')}")
 
+                # Extract dynamic plan update (add/remove/modify subtask, update overview)
+                plan_update = parser.parse_plan_update(response)
+                if plan_update:
+                    applied = task.session.react_memory_store.apply_plan_update(task.session_id, plan_update)
+                    if applied:
+                        op = plan_update["operation"]
+                        if op == "add":
+                            logger.info(f"[TaskManager] Plan updated: added subtask '{plan_update['description']}'")
+                        elif op == "remove":
+                            logger.info(f"[TaskManager] Plan updated: removed subtask {plan_update['subtask_id']}")
+                        elif op == "modify":
+                            logger.info(f"[TaskManager] Plan updated: modified subtask {plan_update['subtask_id']}")
+                        elif op == "update_overview":
+                            logger.info(f"[TaskManager] Plan updated: overview changed to '{plan_update['overview']}'")
+
                 # Record iteration
                 iteration_record = IterationRecord(
                     iteration_number=iteration_num,

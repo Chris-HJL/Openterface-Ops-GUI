@@ -66,6 +66,48 @@ class ResponseParser:
         return {"id": match.group(1), "status": match.group(2), "notes": match.group(3).strip()}
 
     @staticmethod
+    def parse_plan_update(text: str) -> Optional[Dict]:
+        """
+        Parse dynamic plan update from LLM response.
+
+        Expected formats:
+        <plan_update operation="add" description="New subtask" insert_after_id="2"></plan_update>
+        <plan_update operation="remove" subtask_id="3"></plan_update>
+        <plan_update operation="modify" subtask_id="1" description="Updated description"></plan_update>
+        <plan_update operation="update_overview" overview="Updated overview"></plan_update>
+
+        Returns:
+            Dict with 'operation' and additional fields, or None if not found.
+        """
+        pattern = r'<plan_update\s+operation="(\w+)"(.*?)></plan_update>'
+        match = re.search(pattern, text, re.DOTALL)
+        if not match:
+            return None
+        result = {"operation": match.group(1)}
+        attrs = match.group(2)
+        # Extract description
+        desc_match = re.search(r'description="([^"]*)"', attrs)
+        if desc_match:
+            result["description"] = desc_match.group(1)
+        # Extract subtask_id
+        sid_match = re.search(r'subtask_id="(\d+)"', attrs)
+        if sid_match:
+            result["subtask_id"] = sid_match.group(1)
+        # Extract insert_after_id
+        insert_match = re.search(r'insert_after_id="(\d+)"', attrs)
+        if insert_match:
+            result["insert_after_id"] = insert_match.group(1)
+        # Extract overview
+        overview_match = re.search(r'overview="([^"]*)"', attrs)
+        if overview_match:
+            result["overview"] = overview_match.group(1)
+        # Extract notes
+        notes_match = re.search(r'notes="([^"]*)"', attrs)
+        if notes_match:
+            result["notes"] = notes_match.group(1)
+        return result
+
+    @staticmethod
     def extract_action_and_element(text: str) -> Tuple[Optional[str], Optional[str], Optional[str], Optional[str], Optional[Tuple[int, int]]]:
         """
         Extract action and element from response
